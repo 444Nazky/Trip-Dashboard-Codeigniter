@@ -26,6 +26,8 @@ export function RoutesTab({ serverState, showToast }: RoutesTabProps) {
   const [resolvingLink, setResolvingLink] = useState(false)
   /** true → lat/lng terisi otomatis dari link Google Maps (input jadi read-only) */
   const [coordsFromLink, setCoordsFromLink] = useState(false)
+  /** true → admin membuka kunci input koordinat untuk koreksi manual */
+  const [manualCoords, setManualCoords] = useState(false)
   const [currentRouteForGeofence, setCurrentRouteForGeofence] = useState<RouteRow | null>(null)
 
   const loadRoutes = async () => {
@@ -135,18 +137,23 @@ export function RoutesTab({ serverState, showToast }: RoutesTabProps) {
     })
     setMapsLink('')
     setCoordsFromLink(false)
+    setManualCoords(false)
   }
 
   const startEditGeofence = (point: GeofencePoint) => {
     setActiveGeofence({ ...point })
     setMapsLink('')
+    // Titik lama sudah punya koordinat tersimpan → langsung mode manual agar
+    // admin bisa mengoreksi tanpa harus menempel ulang link.
     setCoordsFromLink(false)
+    setManualCoords(true)
   }
 
   const cancelGeofenceEdit = () => {
     setActiveGeofence(null)
     setMapsLink('')
     setCoordsFromLink(false)
+    setManualCoords(false)
   }
 
   /**
@@ -183,6 +190,7 @@ export function RoutesTab({ serverState, showToast }: RoutesTabProps) {
       return { ...prev, latitude: String(parsed.latitude), longitude: String(parsed.longitude), radiusMeters: radius }
     })
     setCoordsFromLink(true)
+    setManualCoords(false)
     setMapsLink('')
     showToast('Koordinat terisi otomatis dari link Google Maps')
   }
@@ -226,27 +234,38 @@ export function RoutesTab({ serverState, showToast }: RoutesTabProps) {
       return
     }
 
-    const lat = Number.parseFloat(latitude)
-    const lon = Number.parseFloat(longitude)
-    const rad = Number.parseFloat(radiusMeters)
-    if (Number.isNaN(lat) || Number.isNaN(lon) || !Number.isFinite(lat) || !Number.isFinite(lon)) {
-      showToast('Latitude & Longitude wajib diisi', 'error')
+    // Validasi ketat: tolak kosong / null / placeholder teks template.
+    const PLACEHOLDER_RE = /otomatis|link maps|latitude|longitude|^[-—]$/i
+    const rawLat = latitude.trim()
+    const rawLon = longitude.trim()
+    if (!rawLat || !rawLon || PLACEHOLDER_RE.test(rawLat) || PLACEHOLDER_RE.test(rawLon)) {
+      showToast('Koordinat belum terisi. Tempel link Google Maps atau isi Latitude & Longitude manual.', 'error')
+      return
+    }
+
+    const lat = Number.parseFloat(rawLat.replace(',', '.'))
+    const lon = Number.parseFloat(rawLon.replace(',', '.'))
+    const rad = Number.parseFloat(radiusMeters.replace(',', '.'))
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+      showToast('Latitude & Longitude harus berupa angka', 'error')
       return
     }
     if (Math.abs(lat) > 90 || Math.abs(lon) > 180) {
       showToast('Koordinat di luar rentang valid (lat ±90, lng ±180)', 'error')
       return
     }
-    if (Number.isNaN(rad) || rad <= 0 || rad > 10000) {
+    if (!Number.isFinite(rad) || rad <= 0 || rad > 10000) {
       showToast('Radius harus angka valid 1–10000 meter', 'error')
       return
     }
 
+    // Payload final — SEMUA numerik (float) & nama ter-trim; siap ke
+    // POST /api/geofences (create) atau PUT /api/geofences/:id (update).
     const data = {
       locationName: locationName.trim(),
-      latitude: lat,
-      longitude: lon,
-      radiusMeters: rad,
+      latitude: Number(lat),
+      longitude: Number(lon),
+      radiusMeters: Number(rad),
       description: description.trim(),
     }
 
@@ -515,6 +534,10 @@ export function RoutesTab({ serverState, showToast }: RoutesTabProps) {
                         {resolvingLink ? 'Memproses…' : 'Isi Otomatis'}
                       </button>
                     </div>
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      Tempel URL pendek (maps.app.goo.gl) atau URL penuh Google Maps — koordinat terisi otomatis. Bila gagal,
+                      tekan <span className="font-semibold">Isi Otomatis</span> atau isi koordinat manual di bawah.
+                    </p>
                   </div>
 
                   {/* Lat/Lng Fields — otomatis dari link, read-only */}
@@ -530,10 +553,12 @@ export function RoutesTab({ serverState, showToast }: RoutesTabProps) {
                       </label>
                       <input
                         value={activeGeofence.latitude}
-                        readOnly
-                        disabled
-                        placeholder="Otomatis dari link Maps"
-                        className={`w-full border rounded-xl px-3 py-2.5 text-xs font-mono ${coordsFromLink && activeGeofence.latitude ? 'border-slate-200 bg-slate-100 text-slate-500' : 'border-slate-200 bg-slate-50 text-slate-400'}`}
+                        readOnly={!manualCoords}
+                        disabled={!manualCoords}
+                        inputMode="decimal"
+                        onChange={e => setActiveGeofence(prev => prev ? { ...prev, latitude: e.target.value } : null)}
+                        placeholder="Tempel link, atau aktifkan isian manual"
+                        className={`w-full border rounded-xl px-3 py-2.5 text-xs font-mono ${!manualCoords ? 'border-slate-200 bg-slate-100 text-slate-500' : 'border-blue-300 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500'}`}
                       />
                     </div>
                     <div>
@@ -547,13 +572,26 @@ export function RoutesTab({ serverState, showToast }: RoutesTabProps) {
                       </label>
                       <input
                         value={activeGeofence.longitude}
-                        readOnly
-                        disabled
-                        placeholder="Otomatis dari link Maps"
-                        className={`w-full border rounded-xl px-3 py-2.5 text-xs font-mono ${coordsFromLink && activeGeofence.longitude ? 'border-slate-200 bg-slate-100 text-slate-500' : 'border-slate-200 bg-slate-50 text-slate-400'}`}
+                        readOnly={!manualCoords}
+                        disabled={!manualCoords}
+                        inputMode="decimal"
+                        onChange={e => setActiveGeofence(prev => prev ? { ...prev, longitude: e.target.value } : null)}
+                        placeholder="Tempel link, atau aktifkan isian manual"
+                        className={`w-full border rounded-xl px-3 py-2.5 text-xs font-mono ${!manualCoords ? 'border-slate-200 bg-slate-100 text-slate-500' : 'border-blue-300 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500'}`}
                       />
                     </div>
                   </div>
+
+                  {/* Opsi koreksi manual — admin tetap bisa memperbaiki angka bila perlu */}
+                  <label className="flex items-center gap-2 text-[11px] text-slate-500 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={manualCoords}
+                      onChange={e => setManualCoords(e.target.checked)}
+                      className="rounded border-slate-300"
+                    />
+                    Isi koordinat manual (koreksi bila hasil otomatis kurang tepat)
+                  </label>
 
                   {/* Location Name */}
                   <div>
