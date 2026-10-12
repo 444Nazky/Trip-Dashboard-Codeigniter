@@ -1,6 +1,9 @@
 import { useState } from 'react'
+import { MapPin, Plus, Pencil, Trash2, X, ChevronDown, Link2, ExternalLink, Navigation, Layers } from 'lucide-react'
 import { fetchRoutes, fetchDermagas, createRoute, updateRoute, deleteRoute } from '../../../services/dermagas'
-import type { RouteRow, RouteDermaga, RouteFormState } from '../components/types'
+import { fetchGeofencePointsForRoute, createRouteGeofencePoint, deleteGeofenceRule } from '../../../services/geofences'
+import { parseMapsUrl, resolveMapsShortLink, osmEmbeddedMapUrl, googleMapsLink } from '../../../services/geo'
+import type { RouteRow, RouteDermaga, RouteFormState, GeofencePoint } from '../components/types'
 import { emptyRouteForm } from '../components/types'
 
 interface RoutesTabProps {
@@ -14,6 +17,14 @@ export function RoutesTab({ serverState, showToast }: RoutesTabProps) {
   const [routeState, setRouteState] = useState<'idle' | 'loading' | 'ready' | 'offline'>('idle')
   const [routeForm, setRouteForm] = useState<RouteFormState>(emptyRouteForm)
   const [editRouteId, setEditRouteId] = useState<string | null>(null)
+
+  // Geofence modal state
+  const [showGeofencePanel, setShowGeofencePanel] = useState(false)
+  const [geofencePoints, setGeofencePoints] = useState<GeofencePoint[]>([])
+  const [activeGeofence, setActiveGeofence] = useState<GeofencePoint | null>(null)
+  const [mapsLink, setMapsLink] = useState('')
+  const [resolvingLink, setResolvingLink] = useState(false)
+  const [currentRouteForGeofence, setCurrentRouteForGeofence] = useState<RouteRow | null>(null)
 
   const loadRoutes = async () => {
     if (routeState !== 'idle') return
@@ -41,6 +52,7 @@ export function RoutesTab({ serverState, showToast }: RoutesTabProps) {
       route_to: r.route_to,
       distance: r.distance ?? '',
       duration: r.duration ?? '',
+      geofencePoints: [],
     })
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -75,6 +87,156 @@ export function RoutesTab({ serverState, showToast }: RoutesTabProps) {
     showToast('Rute dihapus')
     const fresh = await fetchRoutes()
     if (fresh) setRouteRows(fresh as RouteRow[])
+  }
+
+  // ─── Geofence Management ─────────────────────────────────────────────────────
+
+  const loadGeofencePoints = async (routeCode: string) => {
+    if (!routeCode) return
+    const points = await fetchGeofencePointsForRoute(routeCode)
+    const mapped: GeofencePoint[] = points.map(p => ({
+      id: p.id,
+      locationName: p.locationName,
+      latitude: String(p.latitude),
+      longitude: String(p.longitude),
+      radiusMeters: String(p.radiusMeters),
+      description: p.description || '',
+    }))
+    setGeofencePoints(mapped)
+  }
+
+  const openGeofencePanel = async (r: RouteRow) => {
+    setShowGeofencePanel(true)
+    setActiveGeofence(null)
+    setMapsLink('')
+    setCurrentRouteForGeofence(r)
+    const routeCode = `${r.route_from}-${r.route_to}`
+    await loadGeofencePoints(routeCode)
+  }
+
+  const closeGeofencePanel = () => {
+    setShowGeofencePanel(false)
+    setActiveGeofence(null)
+    setGeofencePoints([])
+    setMapsLink('')
+    setCurrentRouteForGeofence(null)
+  }
+
+  const startAddGeofence = () => {
+    setActiveGeofence({
+      id: undefined,
+      locationName: '',
+      latitude: '',
+      longitude: '',
+      radiusMeters: '100',
+      description: '',
+    })
+    setMapsLink('')
+  }
+
+  const startEditGeofence = (point: GeofencePoint) => {
+    setActiveGeofence({ ...point })
+    setMapsLink('')
+  }
+
+  const cancelGeofenceEdit = () => {
+    setActiveGeofence(null)
+    setMapsLink('')
+  }
+
+  const handleMapsLinkGeofence = async () => {
+    const raw = mapsLink.trim()
+    if (!raw || !activeGeofence) return
+    let candidate = raw
+    if (/goo\.gl|maps\.app/i.test(raw) && !/@|q=|[?&]lat/i.test(raw)) {
+      setResolvingLink(true)
+      const resolved = await resolveMapsShortLink(raw)
+      setResolvingLink(false)
+      if (!resolved) {
+        showToast('Short link gagal di-resolve. Buka link di tab baru, lalu copy URL penuh.', 'error')
+        return
+      }
+      candidate = resolved
+    }
+    const parsed = parseMapsUrl(candidate)
+    if (!parsed) {
+      showToast('Koordinat tidak ditemukan di link. Coba paste URL penuh.', 'error')
+      return
+    }
+    setActiveGeofence(prev => prev ? {
+      ...prev,
+      latitude: String(parsed.latitude),
+      longitude: String(parsed.longitude),
+    } : null)
+    setMapsLink('')
+    showToast('Koordinat terisi dari link Google Maps')
+  }
+
+  const saveGeofencePoint = async (routeCode: string) => {
+    if (!activeGeofence) return
+    const { id, locationName, latitude, longitude, radiusMeters, description } = activeGeofence
+
+    if (!locationName.trim()) {
+      showToast('Nama lokasi wajib diisi', 'error')
+      return
+    }
+
+    const lat = parseFloat(latitude)
+    const lon = parseFloat(longitude)
+    if (isNaN(lat) || isNaN(lon)) {
+      showToast('Latitude & Longitude wajib diisi', 'error')
+      return
+    }
+
+    const data = {
+      locationName: locationName.trim(),
+      latitude: lat,
+      longitude: lon,
+      radiusMeters: parseFloat(radiusMeters) || 100,
+      description: description.trim(),
+    }
+
+    if (id) {
+      // Update existing
+      const { updateGeofenceRule } = await import('../../../services/geofences')
+      const ok = await updateGeofenceRule(id, data)
+      if (!ok) {
+        showToast('Gagal update titik geofence', 'error')
+        return
+      }
+    } else {
+      // Create new
+      const newId = await createRouteGeofencePoint(routeCode, data)
+      if (!newId) {
+        showToast('Gagal tambah titik geofence', 'error')
+        return
+      }
+    }
+
+    showToast(id ? 'Titik geofence diperbarui' : 'Titik geofence ditambahkan')
+    setActiveGeofence(null)
+    await loadGeofencePoints(routeCode)
+  }
+
+  const deleteGeofencePoint = async (point: GeofencePoint, routeCode: string) => {
+    if (!point.id) {
+      // Local-only point
+      setGeofencePoints(prev => prev.filter(p => p !== point))
+      return
+    }
+    if (!confirm('Hapus titik geofence ini?')) return
+    const ok = await deleteGeofenceRule(point.id)
+    if (!ok) {
+      showToast('Gagal hapus titik geofence', 'error')
+      return
+    }
+    showToast('Titik geofence dihapus')
+    await loadGeofencePoints(routeCode)
+  }
+
+  const getRouteCode = () => {
+    if (!currentRouteForGeofence) return ''
+    return `${currentRouteForGeofence.route_from}-${currentRouteForGeofence.route_to}`
   }
 
   return (
@@ -168,6 +330,9 @@ export function RoutesTab({ serverState, showToast }: RoutesTabProps) {
                 <td className="p-4 text-slate-500">{r.duration || '—'}</td>
                 <td className="p-4 text-right whitespace-nowrap">
                   <button onClick={() => startEdit(r)} className="text-blue-600 font-bold text-sm mr-3 hover:underline">Edit</button>
+                  <button onClick={() => void openGeofencePanel(r)} className="text-emerald-600 font-bold text-sm mr-3 hover:underline flex items-center gap-1">
+                    <MapPin size={12} /> Geofence
+                  </button>
                   <button onClick={() => void handleDel(r.id)} className="text-red-500 font-bold text-sm hover:underline">Hapus</button>
                 </td>
               </tr>
@@ -175,6 +340,225 @@ export function RoutesTab({ serverState, showToast }: RoutesTabProps) {
           </tbody>
         </table>
       </div>
+
+      {/* ─── Geofence Points Panel ─────────────────────────────────────────── */}
+      {showGeofencePanel && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 border-b border-slate-200">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center">
+                  <MapPin size={20} className="text-emerald-600" />
+                </div>
+                <div>
+                  <h3 className="font-black text-slate-900 text-lg">Titik Geofence</h3>
+                  <p className="text-slate-500 text-xs">
+                    Rute: <span className="font-mono font-semibold">{currentRouteForGeofence?.name || getRouteCode()}</span>
+                    {currentRouteForGeofence && (
+                      <span className="ml-2">({currentRouteForGeofence.route_from} → {currentRouteForGeofence.route_to})</span>
+                    )}
+                  </p>
+                </div>
+              </div>
+              <button onClick={closeGeofencePanel} className="text-slate-400 hover:text-slate-600">
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-4">
+              {/* Existing Points */}
+              {geofencePoints.length === 0 && !activeGeofence && (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800 text-center">
+                  Belum ada titik geofence untuk rute ini.<br />
+                  Tambahkan titik untuk validasi lokasi petugas.
+                </div>
+              )}
+
+              {/* Point List */}
+              {geofencePoints.map((point, idx) => (
+                <div key={point.id || idx} className="bg-slate-50 rounded-xl p-4 border border-slate-200">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <p className="font-semibold text-slate-900">{point.locationName}</p>
+                      <p className="text-xs text-slate-500 font-mono mt-1">
+                        {point.latitude}, {point.longitude} · {point.radiusMeters}m
+                      </p>
+                      {point.description && (
+                        <p className="text-xs text-slate-400 mt-1">{point.description}</p>
+                      )}
+                      {point.latitude && point.longitude && !isNaN(parseFloat(point.latitude)) && (
+                        <div className="mt-2">
+                          <iframe
+                            title={`Preview ${point.locationName}`}
+                            src={osmEmbeddedMapUrl(parseFloat(point.latitude), parseFloat(point.longitude))}
+                            className="w-full h-32 rounded-lg border border-slate-200"
+                            loading="lazy"
+                          />
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex gap-1 ml-3">
+                      <a
+                        href={point.latitude && point.longitude ? googleMapsLink(parseFloat(point.latitude), parseFloat(point.longitude)) : '#'}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="p-2 text-slate-400 hover:text-emerald-600 rounded-lg hover:bg-emerald-50"
+                      >
+                        <ExternalLink size={14} />
+                      </a>
+                      <button
+                        onClick={() => startEditGeofence(point)}
+                        className="p-2 text-slate-400 hover:text-blue-600 rounded-lg hover:bg-blue-50"
+                      >
+                        <Pencil size={14} />
+                      </button>
+                      <button
+                        onClick={() => deleteGeofencePoint(point, getRouteCode())}
+                        className="p-2 text-slate-400 hover:text-red-500 rounded-lg hover:bg-red-50"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              {/* Add/Edit Form */}
+              {activeGeofence !== null && (
+                <div className="bg-blue-50 rounded-xl p-4 border border-blue-200 space-y-4">
+                  <h4 className="font-bold text-blue-900 text-sm">
+                    {activeGeofence.id ? 'Edit Titik' : 'Tambah Titik Baru'}
+                  </h4>
+
+                  {/* Google Maps URL Input */}
+                  <div>
+                    <label className="text-xs font-semibold text-slate-600 block mb-1">
+                      Paste Link Google Maps <span className="font-normal text-slate-400">(koordinat otomatis)</span>
+                    </label>
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <Link2 size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                        <input
+                          value={mapsLink}
+                          onChange={e => setMapsLink(e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); void handleMapsLinkGeofence() } }}
+                          placeholder="https://maps.app.goo.gl/1Gsfc4xo2wGbpf3k9"
+                          className="w-full border border-slate-200 rounded-xl pl-9 pr-3 py-2.5 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+                      <button
+                        onClick={() => void handleMapsLinkGeofence()}
+                        disabled={!mapsLink.trim() || resolvingLink}
+                        className="px-4 py-2.5 bg-slate-800 text-white text-xs font-bold rounded-xl hover:bg-slate-900 disabled:opacity-40"
+                      >
+                        {resolvingLink ? '…' : 'Isi Otomatis'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Lat/Lng Fields */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs font-semibold text-slate-600 block mb-1">Latitude</label>
+                      <input
+                        value={activeGeofence.latitude}
+                        onChange={e => setActiveGeofence(prev => prev ? { ...prev, latitude: e.target.value } : null)}
+                        placeholder="-6.1891005"
+                        className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-slate-600 block mb-1">Longitude</label>
+                      <input
+                        value={activeGeofence.longitude}
+                        onChange={e => setActiveGeofence(prev => prev ? { ...prev, longitude: e.target.value } : null)}
+                        placeholder="106.8371641"
+                        className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Location Name */}
+                  <div>
+                    <label className="text-xs font-semibold text-slate-600 block mb-1">Nama Lokasi</label>
+                    <input
+                      value={activeGeofence.locationName}
+                      onChange={e => setActiveGeofence(prev => prev ? { ...prev, locationName: e.target.value } : null)}
+                      placeholder="cth: Dermaga Badau - Titik A"
+                      className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  {/* Radius */}
+                  <div>
+                    <label className="text-xs font-semibold text-slate-600 block mb-1">Radius (meter)</label>
+                    <input
+                      type="number"
+                      value={activeGeofence.radiusMeters}
+                      onChange={e => setActiveGeofence(prev => prev ? { ...prev, radiusMeters: e.target.value } : null)}
+                      placeholder="100"
+                      className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  {/* Description */}
+                  <div>
+                    <label className="text-xs font-semibold text-slate-600 block mb-1">Keterangan <span className="font-normal text-slate-400">(opsional)</span></label>
+                    <input
+                      value={activeGeofence.description}
+                      onChange={e => setActiveGeofence(prev => prev ? { ...prev, description: e.target.value } : null)}
+                      placeholder="Deskripsi titik geofence..."
+                      className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  {/* Preview */}
+                  {activeGeofence.latitude && activeGeofence.longitude && !isNaN(parseFloat(activeGeofence.latitude)) && (
+                    <div>
+                      <iframe
+                        title="Preview titik"
+                        src={osmEmbeddedMapUrl(parseFloat(activeGeofence.latitude), parseFloat(activeGeofence.longitude))}
+                        className="w-full h-40 rounded-xl border border-slate-200"
+                        loading="lazy"
+                      />
+                    </div>
+                  )}
+
+                  {/* Actions */}
+                  <div className="flex gap-2 pt-2">
+                    <button
+                      onClick={cancelGeofenceEdit}
+                      className="flex-1 py-2.5 text-slate-600 font-semibold text-xs border border-slate-200 rounded-xl hover:bg-slate-100"
+                    >
+                      Batal
+                    </button>
+                    <button
+                      onClick={() => saveGeofencePoint(getRouteCode())}
+                      className="flex-1 py-2.5 bg-blue-600 text-white font-bold text-xs rounded-xl hover:bg-blue-700"
+                    >
+                      Simpan
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 border-t border-slate-200">
+              {!activeGeofence && (
+                <button
+                  onClick={startAddGeofence}
+                  className="w-full py-3 bg-emerald-600 text-white font-bold text-sm rounded-xl hover:bg-emerald-700 flex items-center justify-center gap-2"
+                >
+                  <Plus size={16} /> Tambah Titik Geofence
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -13,13 +13,13 @@ import { logout as auth_logout } from '../services/auth'
 export const AUTH_EVENT = 'admin-login'
 
 const LS_KEYS = {
-  trips: 'trip.trips.v1',
-  tariffs: 'trip.tariffs.v1',
-  officers: 'trip.officers.v1',
+  trips: 'trip.admin.trips.v1',
+  tariffs: 'trip.admin.tariffs.v1',
+  officers: 'trip.admin.officers.v1',
 } as const
 
 /** Kunci sesi token (ADMIN_KEY) agar LoginPage sinkron dengan Shell. */
-const ADMIN_KEY = 'trip.auth.admin.v1'
+const ADMIN_KEY = 'trip.admin.session.v1'
 
 function loadStoredSession(): { token: string; username: string } | null {
   try {
@@ -93,8 +93,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => { try { localStorage.setItem(LS_KEYS.officers, JSON.stringify(officers)) } catch { /* quota */ } }, [officers])
 
   const ctx = useMemo<StoreValue>(
-    () => ({ userType, token, logout, trips, tariffs: [], saveTariffs, officers: [], saveOfficers }),
-    [userType, token, logout],
+    () => ({ userType, token, logout, trips, tariffs, saveTariffs, officers, saveOfficers }),
+    [userType, token, logout, trips, tariffs, officers, saveTariffs, saveOfficers],
   )
 
   return <AppContext.Provider value={ctx}>{children}</AppContext.Provider>

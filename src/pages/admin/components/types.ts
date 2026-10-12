@@ -10,6 +10,7 @@ export type AdminTab =
   | 'routes'
   | 'officers'
   | 'reports'
+  | 'geofence'
   | 'settings'
 
 export interface TariffRow {
@@ -52,6 +53,16 @@ export interface RouteFormState {
   route_to: string
   distance: string
   duration: string
+  geofencePoints: GeofencePoint[]
+}
+
+export interface GeofencePoint {
+  id?: string          // local id for new points
+  locationName: string
+  latitude: string
+  longitude: string
+  radiusMeters: string
+  description: string
 }
 
 export const emptyRouteForm: RouteFormState = {
@@ -61,6 +72,7 @@ export const emptyRouteForm: RouteFormState = {
   route_to: '',
   distance: '',
   duration: '',
+  geofencePoints: [],
 }
 
 export interface DermagaAccess {

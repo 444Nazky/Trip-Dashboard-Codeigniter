@@ -5,3 +5,4 @@ export { RoutesTab } from './RoutesTab'
 export { OfficersTab } from './OfficersTab'
 export { ReportsTab } from './ReportsTab'
 export { SettingsTab } from './SettingsTab'
+// GeofenceTab dihapus - fitur sudah digabung di RoutesTab (Master Rute)

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Truck, LayoutGrid, Table2, Hash, Users, BarChart2, Settings, LogOut, Check, X } from 'lucide-react'
+import { Truck, LayoutGrid, Table2, Hash, Users, BarChart2, Settings, LogOut, Check, X, MapPin } from 'lucide-react'
 import { useApp } from '../store'
 import { fetchTariffs, fetchRegionTariffs } from '../../services/tariffs'
 import { fetchRegions } from '../../services/regions'
@@ -20,6 +20,7 @@ import ReportSheet from './ReportSheet'
 
 // Tabs
 import { OverviewTab, TariffTab, PlatesTab, RoutesTab, OfficersTab, ReportsTab, SettingsTab } from './tabs'
+// GeofenceTab dihapus - fitur sudah digabung di RoutesTab (Master Rute)
 
 export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const { trips: localTrips, tariffs, saveTariffs, officers, saveOfficers } = useApp()
@@ -128,9 +129,10 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
     { key: 'overview', label: 'Dashboard', Icon: LayoutGrid },
     { key: 'tariff', label: 'Master Tarif', Icon: Table2 },
     { key: 'plates', label: 'Master Plat', Icon: Hash },
-    { key: 'routes', label: 'Master Rute', Icon: Hash },
+    { key: 'routes', label: 'Master Rute', Icon: MapPin },
     { key: 'officers', label: 'Petugas', Icon: Users },
     { key: 'reports', label: 'Laporan', Icon: BarChart2 },
+    // Geofencing tab dihapus - fitur sudah di Master Rute
     { key: 'settings', label: 'Pengaturan', Icon: Settings },
   ]
 

@@ -19,7 +19,7 @@ export type MobileScreen =
   | 'profile'
   | 'settings'
 
-export type AdminTab = 'overview' | 'tariff' | 'plates' | 'officers' | 'reports' | 'settings'
+export type AdminTab = 'overview' | 'tariff' | 'plates' | 'routes' | 'officers' | 'reports' | 'geofence' | 'settings'
 
 export interface Region {
   id: string
