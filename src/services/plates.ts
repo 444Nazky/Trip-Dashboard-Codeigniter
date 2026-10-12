@@ -17,20 +17,6 @@ export interface PlateRecord {
   created_at: string
 }
 
-export interface PlateCheck {
-  found: boolean
-  plate: string
-  owner: string | null
-  status: PlateStatus
-  /** null untuk internal (tidak dikenakan tarif) */
-  jenisTarif: 'lokal' | 'eksternal' | null
-  originRegionId: string | null
-  originRegionCode: string | null
-  checkpointRegionId: string | null
-  checkpointRegionCode: string | null
-  tariffAmount: number
-}
-
 /** Daftar plat terdaftar (admin). null = server tidak terjangkau. */
 export async function fetchPlates(): Promise<PlateRecord[] | null> {
   const res = await api.get<PlateRecord[]>('/plates')

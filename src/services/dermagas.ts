@@ -3,7 +3,6 @@
 import { api } from './api'
 import type { Region, Dermaga, Route } from '../pages/types'
 
-export { type Region, type Dermaga, type Route }
 
 export async function fetchRegions(): Promise<Region[] | null> {
   const result = await api.get<Region[]>('/regions')

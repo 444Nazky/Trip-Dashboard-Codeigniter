@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { MapPin, Plus, Pencil, Trash2, X, ChevronDown, Link2, ExternalLink, Navigation, Layers } from 'lucide-react'
 import { fetchRoutes, fetchDermagas, createRoute, updateRoute, deleteRoute } from '../../../services/dermagas'
 import { fetchGeofencePointsForRoute, createRouteGeofencePoint, deleteGeofenceRule } from '../../../services/geofences'
-import { parseMapsUrl, resolveMapsShortLink, osmEmbeddedMapUrl, googleMapsLink } from '../../../services/geo'
+import { parseMapsUrl, resolveMapsShortLink, osmEmbeddedMapUrl, googleMapsLink, type ParsedGeo } from '../../../services/geo'
 import type { RouteRow, RouteDermaga, RouteFormState, GeofencePoint } from '../components/types'
 import { emptyRouteForm } from '../components/types'
 
@@ -24,6 +24,8 @@ export function RoutesTab({ serverState, showToast }: RoutesTabProps) {
   const [activeGeofence, setActiveGeofence] = useState<GeofencePoint | null>(null)
   const [mapsLink, setMapsLink] = useState('')
   const [resolvingLink, setResolvingLink] = useState(false)
+  /** true → lat/lng terisi otomatis dari link Google Maps (input jadi read-only) */
+  const [coordsFromLink, setCoordsFromLink] = useState(false)
   const [currentRouteForGeofence, setCurrentRouteForGeofence] = useState<RouteRow | null>(null)
 
   const loadRoutes = async () => {
@@ -132,44 +134,87 @@ export function RoutesTab({ serverState, showToast }: RoutesTabProps) {
       description: '',
     })
     setMapsLink('')
+    setCoordsFromLink(false)
   }
 
   const startEditGeofence = (point: GeofencePoint) => {
     setActiveGeofence({ ...point })
     setMapsLink('')
+    setCoordsFromLink(false)
   }
 
   const cancelGeofenceEdit = () => {
     setActiveGeofence(null)
     setMapsLink('')
+    setCoordsFromLink(false)
   }
 
-  const handleMapsLinkGeofence = async () => {
-    const raw = mapsLink.trim()
-    if (!raw || !activeGeofence) return
-    let candidate = raw
-    if (/goo\.gl|maps\.app/i.test(raw) && !/@|q=|[?&]lat/i.test(raw)) {
+  /**
+   * Ekstrak koordinat dari teks link Google Maps (dipanggil otomatis saat
+   * paste/onChange — admin tidak perlu tekan tombol apa pun).
+   * Short link goo.gl/maps.app di-resolve dulu (async), lalu di-parse.
+   */
+  const extractCoordsFromMapsLink = async (raw: string): Promise<ParsedGeo | null> => {
+    const trimmed = raw.trim()
+    if (!trimmed) return null
+    let candidate = trimmed
+    // Short link perlu diikuti redirect-nya sebelum koordinat bisa dibaca
+    if (/goo\.gl|maps\.app/i.test(trimmed) && !/@|q=|[?&]lat/i.test(trimmed)) {
       setResolvingLink(true)
-      const resolved = await resolveMapsShortLink(raw)
+      const resolved = await resolveMapsShortLink(trimmed)
       setResolvingLink(false)
       if (!resolved) {
         showToast('Short link gagal di-resolve. Buka link di tab baru, lalu copy URL penuh.', 'error')
-        return
+        return null
       }
       candidate = resolved
     }
     const parsed = parseMapsUrl(candidate)
+    if (!parsed) return null
+    return parsed
+  }
+
+  /** Terapkan hasil parsing ke form: isi lat/lng + default radius 100m. */
+  const applyParsedCoords = (parsed: ParsedGeo) => {
+    setActiveGeofence(prev => {
+      if (!prev) return null
+      // Radius default 100m hanya bila belum diisi admin (kosong)
+      const radius = prev.radiusMeters.trim() ? prev.radiusMeters : '100'
+      return { ...prev, latitude: String(parsed.latitude), longitude: String(parsed.longitude), radiusMeters: radius }
+    })
+    setCoordsFromLink(true)
+    setMapsLink('')
+    showToast('Koordinat terisi otomatis dari link Google Maps')
+  }
+
+  /** Auto-extract saat paste / onChange — tanpa perlu tombol. */
+  const handleMapsLinkChanged = (value: string) => {
+    setMapsLink(value)
+    const raw = value.trim()
+    if (!raw || !activeGeofence) return
+    // URL penuh dgn koordinat: sinkron — isi seketika
+    const quick = /goo\.gl|maps\.app/i.test(raw) && !/@|q=|[?&]lat/i.test(raw)
+      ? null
+      : parseMapsUrl(raw)
+    if (quick) { applyParsedCoords(quick); return }
+    // Short link / belum jelas: coba resolve async (onChange berikutnya menimpa)
+    if (/^https?:\/\//i.test(raw)) {
+      void extractCoordsFromMapsLink(raw).then(parsed => {
+        if (parsed) applyParsedCoords(parsed)
+      })
+    }
+  }
+
+  /** Fallback manual (tombol) — tetap tersedia bila auto-extract gagal. */
+  const handleMapsLinkGeofence = async () => {
+    const raw = mapsLink.trim()
+    if (!raw || !activeGeofence) return
+    const parsed = await extractCoordsFromMapsLink(raw)
     if (!parsed) {
       showToast('Koordinat tidak ditemukan di link. Coba paste URL penuh.', 'error')
       return
     }
-    setActiveGeofence(prev => prev ? {
-      ...prev,
-      latitude: String(parsed.latitude),
-      longitude: String(parsed.longitude),
-    } : null)
-    setMapsLink('')
-    showToast('Koordinat terisi dari link Google Maps')
+    applyParsedCoords(parsed)
   }
 
   const saveGeofencePoint = async (routeCode: string) => {
@@ -181,10 +226,19 @@ export function RoutesTab({ serverState, showToast }: RoutesTabProps) {
       return
     }
 
-    const lat = parseFloat(latitude)
-    const lon = parseFloat(longitude)
-    if (isNaN(lat) || isNaN(lon)) {
+    const lat = Number.parseFloat(latitude)
+    const lon = Number.parseFloat(longitude)
+    const rad = Number.parseFloat(radiusMeters)
+    if (Number.isNaN(lat) || Number.isNaN(lon) || !Number.isFinite(lat) || !Number.isFinite(lon)) {
       showToast('Latitude & Longitude wajib diisi', 'error')
+      return
+    }
+    if (Math.abs(lat) > 90 || Math.abs(lon) > 180) {
+      showToast('Koordinat di luar rentang valid (lat ±90, lng ±180)', 'error')
+      return
+    }
+    if (Number.isNaN(rad) || rad <= 0 || rad > 10000) {
+      showToast('Radius harus angka valid 1–10000 meter', 'error')
       return
     }
 
@@ -192,7 +246,7 @@ export function RoutesTab({ serverState, showToast }: RoutesTabProps) {
       locationName: locationName.trim(),
       latitude: lat,
       longitude: lon,
-      radiusMeters: parseFloat(radiusMeters) || 100,
+      radiusMeters: rad,
       description: description.trim(),
     }
 
@@ -442,7 +496,11 @@ export function RoutesTab({ serverState, showToast }: RoutesTabProps) {
                         <Link2 size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                         <input
                           value={mapsLink}
-                          onChange={e => setMapsLink(e.target.value)}
+                          onChange={e => handleMapsLinkChanged(e.target.value)}
+                          onPaste={e => {
+                            const text = e.clipboardData.getData('text')
+                            if (text) { e.preventDefault(); handleMapsLinkChanged(text) }
+                          }}
                           onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); void handleMapsLinkGeofence() } }}
                           placeholder="https://maps.app.goo.gl/1Gsfc4xo2wGbpf3k9"
                           className="w-full border border-slate-200 rounded-xl pl-9 pr-3 py-2.5 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -451,31 +509,48 @@ export function RoutesTab({ serverState, showToast }: RoutesTabProps) {
                       <button
                         onClick={() => void handleMapsLinkGeofence()}
                         disabled={!mapsLink.trim() || resolvingLink}
+                        title="Koordinat biasanya terisi otomatis — tombol ini cadangan"
                         className="px-4 py-2.5 bg-slate-800 text-white text-xs font-bold rounded-xl hover:bg-slate-900 disabled:opacity-40"
                       >
-                        {resolvingLink ? '…' : 'Isi Otomatis'}
+                        {resolvingLink ? 'Memproses…' : 'Isi Otomatis'}
                       </button>
                     </div>
                   </div>
 
-                  {/* Lat/Lng Fields */}
+                  {/* Lat/Lng Fields — otomatis dari link, read-only */}
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="text-xs font-semibold text-slate-600 block mb-1">Latitude</label>
+                      <label className="text-xs font-semibold text-slate-600 block mb-1 flex items-center gap-2">
+                        Latitude
+                        {coordsFromLink && (
+                          <span className="inline-flex items-center gap-1 text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-full">
+                            ✓ Terisi Otomatis
+                          </span>
+                        )}
+                      </label>
                       <input
                         value={activeGeofence.latitude}
-                        onChange={e => setActiveGeofence(prev => prev ? { ...prev, latitude: e.target.value } : null)}
-                        placeholder="-6.1891005"
-                        className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        readOnly
+                        disabled
+                        placeholder="Otomatis dari link Maps"
+                        className={`w-full border rounded-xl px-3 py-2.5 text-xs font-mono ${coordsFromLink && activeGeofence.latitude ? 'border-slate-200 bg-slate-100 text-slate-500' : 'border-slate-200 bg-slate-50 text-slate-400'}`}
                       />
                     </div>
                     <div>
-                      <label className="text-xs font-semibold text-slate-600 block mb-1">Longitude</label>
+                      <label className="text-xs font-semibold text-slate-600 block mb-1 flex items-center gap-2">
+                        Longitude
+                        {coordsFromLink && (
+                          <span className="inline-flex items-center gap-1 text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-full">
+                            ✓ Terisi Otomatis
+                          </span>
+                        )}
+                      </label>
                       <input
                         value={activeGeofence.longitude}
-                        onChange={e => setActiveGeofence(prev => prev ? { ...prev, longitude: e.target.value } : null)}
-                        placeholder="106.8371641"
-                        className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        readOnly
+                        disabled
+                        placeholder="Otomatis dari link Maps"
+                        className={`w-full border rounded-xl px-3 py-2.5 text-xs font-mono ${coordsFromLink && activeGeofence.longitude ? 'border-slate-200 bg-slate-100 text-slate-500' : 'border-slate-200 bg-slate-50 text-slate-400'}`}
                       />
                     </div>
                   </div>
@@ -491,16 +566,22 @@ export function RoutesTab({ serverState, showToast }: RoutesTabProps) {
                     />
                   </div>
 
-                  {/* Radius */}
+                  {/* Radius — default 100m otomatis setelah link diparse */}
                   <div>
-                    <label className="text-xs font-semibold text-slate-600 block mb-1">Radius (meter)</label>
+                    <label className="text-xs font-semibold text-slate-600 block mb-1">Radius (meter) <span className="font-normal text-slate-400">— default 100 meter</span></label>
                     <input
                       type="number"
+                      min={1}
+                      max={10000}
+                      step={1}
                       value={activeGeofence.radiusMeters}
                       onChange={e => setActiveGeofence(prev => prev ? { ...prev, radiusMeters: e.target.value } : null)}
                       placeholder="100"
                       className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
+                    <p className="text-[10px] text-slate-400 mt-1">
+                      Radius aman zona geofence untuk pengukuran jarak akurat di aplikasi mobile.
+                    </p>
                   </div>
 
                   {/* Description */}
