@@ -197,11 +197,3 @@ export function formatReportDateTime(
   }).replace(/\./g, ':')
   return { date, time, full: `${date} · ${time} WIB` }
 }
-
-export async function fetchTripDetail(id: string): Promise<BackendTrip | null> {
-  const result = await api.get<BackendTrip>(`/trips/${id}`)
-  if (!result.ok || !result.data) {
-    return null
-  }
-  return result.data
-}

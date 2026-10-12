@@ -1,8 +1,3 @@
-export interface Toast {
-  msg: string
-  type: 'success' | 'error'
-}
-
 export type AdminTab =
   | 'overview'
   | 'tariff'

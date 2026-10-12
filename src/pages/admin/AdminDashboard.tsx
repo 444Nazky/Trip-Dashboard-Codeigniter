@@ -19,8 +19,13 @@ import LoginPage from '../LoginPage'
 import ReportSheet from './ReportSheet'
 
 // Tabs
-import { OverviewTab, TariffTab, PlatesTab, RoutesTab, OfficersTab, ReportsTab, SettingsTab } from './tabs'
-// GeofenceTab dihapus - fitur sudah digabung di RoutesTab (Master Rute)
+import { OverviewTab } from './tabs/OverviewTab'
+import { TariffTab } from './tabs/TariffTab'
+import { PlatesTab } from './tabs/PlatesTab'
+import { RoutesTab } from './tabs/RoutesTab'
+import { OfficersTab } from './tabs/OfficersTab'
+import { ReportsTab } from './tabs/ReportsTab'
+import { SettingsTab } from './tabs/SettingsTab'
 
 export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const { trips: localTrips, tariffs, saveTariffs, officers, saveOfficers } = useApp()

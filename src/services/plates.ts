@@ -70,14 +70,3 @@ export async function deletePlate(id: string): Promise<boolean> {
  * di server; `originRegionId` = region asal kendaraan (untuk plat tak terdaftar).
  * null = server tidak terjangkau / request gagal.
  */
-export async function checkPlate(
-  plate: string,
-  originRegionId?: string | null,
-): Promise<PlateCheck | null> {
-  const res = await api.post<PlateCheck>('/plates/check', {
-    plate,
-    originRegionId: originRegionId || undefined,
-  })
-  if (res.ok && res.data) return res.data
-  return null
-}

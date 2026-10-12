@@ -12,11 +12,6 @@ export interface GeofenceRule {
   description: string
 }
 
-export interface GeofenceConfig {
-  maxAccuracyMeters: number
-  defaultRadiusMeters: number
-  rules: GeofenceRule[]
-}
 
 export async function fetchGeofenceRules(): Promise<GeofenceRule[] | null> {
   const res = await api.get<GeofenceRule[]>('/geofences')
@@ -100,15 +95,3 @@ export async function createRouteGeofencePoint(
   })
 }
 
-/**
- * Delete geofence points by route code.
- */
-export async function deleteGeofencePointsForRoute(routeCode: string): Promise<boolean> {
-  const points = await fetchGeofencePointsForRoute(routeCode)
-  if (points.length === 0) return true
-
-  for (const point of points) {
-    await deleteGeofenceRule(point.id)
-  }
-  return true
-}

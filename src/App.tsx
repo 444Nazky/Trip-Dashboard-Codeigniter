@@ -7,17 +7,7 @@ import { ensureAdminSession } from './services/auth'
 // ── Build detection ─────────────────────────────────────────────────────────
 
 /** Admin build ditandai atribut `data-admin` di <html>. MobileApp di-stub saja karena admin bundle tidak butuh mobile screens. */
-export function isAdminBuild(): boolean {
-  try {
-    return document.documentElement.hasAttribute('data-admin')
-  } catch { return false }
-}
-
 /** Sinkronisasi LoginPage → Shell: bersihkan sesi tersimpan. */
-export function clearSession() {
-  try { localStorage.removeItem('trip.auth.admin.v1') } catch { /* noop */ }
-}
-
 // ── Shell: guard utama admin build. Hanya mengenali sesi administrator murni. ──
 function Shell() {
   const [status, setStatus] = useState<'loading' | 'admin' | 'login'>('loading')
