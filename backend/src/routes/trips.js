@@ -3,7 +3,7 @@ const fs = require('fs');
 const multer = require('multer');
 const path = require('path');
 const router = express.Router();
-const { v4: uuidv4 } = require('uuid');
+const { randomUUID } = require('crypto');
 const { db } = require('../db');
 const { authenticate } = require('../middleware/auth');
 
@@ -19,7 +19,7 @@ const { UPLOADS_DIR } = require('../uploads-dir');
 const uploadDocumentation = multer({
   storage: multer.diskStorage({
     destination: (_req, _file, cb) => cb(null, UPLOADS_DIR),
-    filename: (_req, file, cb) => cb(null, `${uuidv4()}${photoExtension(file.mimetype) || '.jpg'}`),
+    filename: (_req, file, cb) => cb(null, `${randomUUID()}${photoExtension(file.mimetype) || '.jpg'}`),
   }),
   limits: { fileSize: 5 * 1024 * 1024, files: 50 },
   fileFilter: (_req, file, cb) => {
@@ -78,7 +78,7 @@ router.post('/complete', authenticate, uploadDocumentation.array('photos', 50), 
 
     const photoPaths = files.map(file => `/uploads/${file.filename}`);
 
-    const tripId = uuidv4();
+    const tripId = randomUUID();
     const noTrip = generateTripNo();
     db.prepare(`
       INSERT INTO trips (
@@ -101,7 +101,7 @@ router.post('/complete', authenticate, uploadDocumentation.array('photos', 50), 
       const amount = masterTariff
         ? (vehicle.hasLoad ? masterTariff.loaded_tariff : masterTariff.empty_tariff)
         : (vehicle.tariffAmount || 0);
-      const vehicleId = uuidv4();
+      const vehicleId = randomUUID();
       const photoIndex = vehiclePhotoIndexes[index];
       db.prepare(`
         INSERT INTO vehicles (
@@ -115,7 +115,7 @@ router.post('/complete', authenticate, uploadDocumentation.array('photos', 50), 
         numericCoordinate(vehicle.latitude), numericCoordinate(vehicle.longitude)
       );
       db.prepare(`INSERT INTO trip_vehicles (id, trip_id, vehicle_id) VALUES (?, ?, ?)`)
-        .run(uuidv4(), tripId, vehicleId);
+        .run(randomUUID(), tripId, vehicleId);
     });
 
     return res.status(201).json({ id: tripId, noTrip });
