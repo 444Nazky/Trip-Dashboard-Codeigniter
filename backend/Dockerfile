@@ -1,6 +1,13 @@
 # Build: 2024-10-13 force-rebuild timestamp to invalidate cache
 FROM node:22.22.3-bookworm-slim
 
+# Install Python for native module builds (better-sqlite3)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 \
+    make \
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 ENV DB_PATH=/data/trip.db
@@ -8,7 +15,7 @@ ENV NODE_ENV=production
 
 # Copy backend files from repo root context
 COPY backend/package*.json ./
-RUN npm ci --omit=dev
+RUN npm ci
 
 COPY backend/src/ ./src/
 
