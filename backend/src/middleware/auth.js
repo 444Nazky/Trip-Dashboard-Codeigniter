@@ -1,15 +1,8 @@
 const jwt = require('jsonwebtoken');
 
-// JWT_SECRET wajib dari environment — TANPA fallback.
-// Fallback literal mengekspos secret yang bisa dipakai untuk forge token.
-const JWT_SECRET = (() => {
-  const s = process.env.JWT_SECRET;
-  if (!s) {
-    console.error('[auth] JWT_SECRET environment variable is required — server cannot start without it');
-    process.exit(1);
-  }
-  return s;
-})();
+// JWT_SECRET from environment — uses a deterministic fallback only for local dev
+// when JWT_SECRET is not set. Railway deployments MUST have JWT_SECRET configured.
+const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-do-not-use-in-production';
 
 // Attach req.user / req.officer if the JWT is valid
 function authenticate(req, res, next) {

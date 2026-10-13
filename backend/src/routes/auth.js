@@ -48,6 +48,10 @@ router.post('/admin-login', (req, res) => {
     res.json({ token, admin: { username: effectiveUser, role: 'admin' } });
   } catch (error) {
     console.error('Admin login error:', error);
+    // Log more details for debugging
+    if (error.code === 'ERR_JWT_SECRET_NOT_IN_PEM') {
+      console.error('JWT_SECRET appears to be invalid. Check your environment variables.');
+    }
     res.status(500).json({ error: 'Admin login failed' });
   }
 });
