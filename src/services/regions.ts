@@ -11,7 +11,5 @@ export interface Region {
 
 /** null = server tidak terjangkau. */
 export async function fetchRegions(): Promise<Region[] | null> {
-  const res = await api.get<Region[]>('/regions')
-  if (res.ok && res.data) return res.data
-  return null
+  return api.getOk<Region[]>('/regions')
 }

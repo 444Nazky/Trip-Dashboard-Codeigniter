@@ -7,7 +7,7 @@
 //    browser sebagai cadangan.
 //  • Map preview (embed tanpa API key) + link buka di Google Maps.
 
-import { getApiBaseUrl } from './api'
+import { api } from './api'
 
 export interface ParsedGeo {
   latitude: number
@@ -97,11 +97,11 @@ function build(latStr: string, lngStr: string, zoomStr?: string): ParsedGeo | nu
 
 /**
  * Short-link goo.gl / maps.app.goo.gl menaruh koordinat DI BELAKANG redirect —
- * parser biasa tidak bisa membaca.
- *
- * Strategi berlapis (yang pertama berhasil dipakai):
- *   1. Resolver SERVER-SIDE (backend /api/geofences/resolve-link). Bebas CORS,
- *      jadi selalu berfungsi di browser produksi.
+ * parser biasa tidak bisa membaca. *  * Strategi berlapis (yang pertama berhasil dipakai):
+ *   1. Resolver SERVER-SIDE (backend /api/geofences/resolve-link). Bebas CORS.
+ *      WAJIB lewat klien `api` (bukan fetch mentah) karena endpoint itu di balik
+ *      middleware `authenticate` — tanpa header Authorization responsenya 401,
+ *      dan itulah sebabnya auto-isi koordinat dulu selalu gagal di produksi.
  *   2. fetch() browser dengan redirect: 'follow' (cadangan bila backend lama).
  *
  * Return URL final (untuk di-parse ulang) atau null bila gagal.
@@ -110,21 +110,18 @@ export async function resolveMapsShortLink(raw: string): Promise<string | null> 
   const url = (raw || '').trim()
   if (!url) return null
 
-  // ── Lapis 1: resolver server-side ──────────────────────────────────────────
-  try {
-    const res = await fetch(
-      `${getApiBaseUrl()}/geofences/resolve-link?url=${encodeURIComponent(url)}`,
-      { headers: { Accept: 'application/json' } },
-    )
-    if (res.ok) {
-      const data = await res.json() as { url?: string; latitude?: number; longitude?: number }
-      // Backend bisa langsung mengembalikan koordinat → encode jadi URL sintetis
-      if (typeof data.latitude === 'number' && typeof data.longitude === 'number') {
-        return `https://www.google.com/maps?q=${data.latitude},${data.longitude}`
-      }
-      if (typeof data.url === 'string' && data.url) return data.url
+  // ── Lapis 1: resolver server-side (dengan token admin) ─────────────────────
+  const res = await api.get<{ url?: string; latitude?: number; longitude?: number }>(
+    `/geofences/resolve-link?url=${encodeURIComponent(url)}`,
+  )
+  if (res.ok && res.data) {
+    const data = res.data
+    // Backend bisa langsung mengembalikan koordinat → encode jadi URL sintetis
+    if (typeof data.latitude === 'number' && typeof data.longitude === 'number') {
+      return `https://www.google.com/maps?q=${data.latitude},${data.longitude}`
     }
-  } catch { /* lanjut ke lapis 2 */ }
+    if (typeof data.url === 'string' && data.url) return data.url
+  }
 
   // ── Lapis 2: fetch browser (berhasil bila server mengizinkan CORS) ─────────
   try {

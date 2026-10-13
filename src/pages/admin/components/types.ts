@@ -5,7 +5,6 @@ export type AdminTab =
   | 'routes'
   | 'officers'
   | 'reports'
-  | 'geofence'
   | 'settings'
 
 export interface TariffRow {
@@ -102,31 +101,4 @@ export interface BackendOfficerRow {
   is_active: number
   regions: { code: string; id: string; name: string }[]
   dermagas?: DermagaAccess[]
-}
-
-export interface PlateRecord {
-  id: string
-  plate: string
-  owner?: string
-  origin_region_id?: string
-  origin_region_code?: string
-  status: PlateStatus
-}
-
-export type PlateStatus = 'internal' | 'lokal' | 'eksternal'
-
-export interface Region {
-  id: string
-  name: string
-  code: string
-}
-
-export interface RegionTariffRow {
-  id: string
-  name: string
-  code: string
-  lokal_tariff?: number
-  lokal_active?: number
-  eksternal_tariff?: number
-  eksternal_active?: number
 }

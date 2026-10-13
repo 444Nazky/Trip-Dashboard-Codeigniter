@@ -3,24 +3,18 @@ import { createContext, useContext, useState, useCallback, type ReactNode } from
 interface CurrencyContextValue {
   revealed: boolean
   toggle: () => void
-  show: () => void
-  hide: () => void
 }
 
 const CurrencyContext = createContext<CurrencyContextValue>({
   revealed: false,
   toggle: () => {},
-  show: () => {},
-  hide: () => {},
 })
 
 export function CurrencyProvider({ children }: { children: ReactNode }) {
   const [revealed, setRevealed] = useState(false)
   const toggle = useCallback(() => setRevealed(r => !r), [])
-  const show = useCallback(() => setRevealed(true), [])
-  const hide = useCallback(() => setRevealed(false), [])
   return (
-    <CurrencyContext.Provider value={{ revealed, toggle, show, hide }}>
+    <CurrencyContext.Provider value={{ revealed, toggle }}>
       {children}
     </CurrencyContext.Provider>
   )

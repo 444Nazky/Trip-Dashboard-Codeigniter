@@ -2,13 +2,13 @@ import { useState, useEffect } from 'react'
 import { Truck, LayoutGrid, Table2, Hash, Users, BarChart2, Settings, LogOut, Check, X, MapPin } from 'lucide-react'
 import { useApp } from '../store'
 import { fetchTariffs, fetchRegionTariffs } from '../../services/tariffs'
-import { fetchRegions } from '../../services/regions'
+import { fetchRegions, type Region } from '../../services/regions'
 import { fetchPlates } from '../../services/plates'
-import { fetchTrips, fetchReportFilters, fetchReportSummary, dayKeyWib } from '../../services/trips'
+import { fetchTrips, fetchReportSummary, dayKeyWib } from '../../services/trips'
 import { ensureAdminSession } from '../../services/auth'
 import { api } from '../../services/api'
 import type { AdminTab } from './components/types'
-import type { TariffRow, RegionTariffRow, BackendOfficerRow, Region } from './components/types'
+import type { BackendOfficerRow } from './components/types'
 import type { BackendTrip } from '../../services/trips'
 import type { PlateRecord } from '../../services/plates'
 import type { Officer } from './components/types'
@@ -28,15 +28,13 @@ import { ReportsTab } from './tabs/ReportsTab'
 import { SettingsTab } from './tabs/SettingsTab'
 
 export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
-  const { trips: localTrips, tariffs, saveTariffs, officers, saveOfficers } = useApp()
+  const { tariffs, saveTariffs, officers, saveOfficers } = useApp()
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
   const [tab, setTab] = useState<AdminTab>('overview')
   const [serverState, setServerState] = useState<'connecting' | 'online' | 'offline'>('connecting')
   const [serverTrips, setServerTrips] = useState<BackendTrip[]>([])
-  const [tariffs2, setTariffs2] = useState<TariffRow[]>([])
   const [regions, setRegions] = useState<Region[]>([])
   const [plates, setPlates] = useState<PlateRecord[]>([])
-  const [backendOfficers, setBackendOfficers] = useState<BackendOfficerRow[]>([])
   const [dashSummary, setDashSummary] = useState<{ totalTrips: number; totalRevenue: number; totalVehicles: number } | null>(null)
   const [dashAt, setDashAt] = useState('')
 
@@ -91,15 +89,12 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
 
       const [tarr, regn, tri] = await Promise.all([fetchTariffs(), fetchRegions(), fetchTrips()])
       if (!alive) return
-      if (tarr !== null && tarr.length > 0) { setTariffs2(tarr); saveTariffs(tarr) }
+      if (tarr !== null && tarr.length > 0) saveTariffs(tarr)
       if (regn) setRegions(regn)
       if (tri !== null) setServerTrips(tri)
 
-      const [offs, filts] = await Promise.all([api.get<BackendOfficerRow[]>('/officers'), fetchReportFilters()])
-      if (alive && offs.ok && offs.data) {
-        setBackendOfficers(offs.data)
-        saveOfficers(mergeBackendOfficers(offs.data, officers))
-      }
+      const offs = await api.getOk<BackendOfficerRow[]>('/officers')
+      if (alive && offs) saveOfficers(mergeBackendOfficers(offs, officers))
 
       setServerState('online')
     })()
@@ -204,9 +199,9 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
 
           {tab === 'tariff' && (
             <TariffTab
-              tariffs={tariffs2.length > 0 ? tariffs2 : tariffs}
+              tariffs={tariffs}
               serverState={serverState}
-              onSaveTariffs={(t) => { setTariffs2(t); saveTariffs(t) }}
+              onSaveTariffs={saveTariffs}
               showToast={showToast}
             />
           )}
@@ -247,9 +242,8 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
             <SettingsTab
               onLogout={onLogout}
               serverState={serverState}
-              tariffs={tariffs2.length > 0 ? tariffs2 : tariffs}
+              tariffs={tariffs}
               officers={officers}
-              localTrips={localTrips}
               showToast={showToast}
             />
           )}

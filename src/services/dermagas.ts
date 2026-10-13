@@ -1,22 +1,33 @@
 // ─── Regions, Dermagas, Routes Service ───────────────────────────────────────
 
 import { api } from './api'
-import type { Region, Dermaga, Route } from '../pages/types'
 
-
-export async function fetchRegions(): Promise<Region[] | null> {
-  const result = await api.get<Region[]>('/regions')
-  return result.ok ? result.data ?? null : null
+export interface Dermaga {
+  id: string
+  region_id: string
+  name: string
+  code: string
+  region_name?: string
+  region_code?: string
 }
 
+export interface Route {
+  id: string
+  dermaga_id: string
+  name: string
+  route_from: string
+  route_to: string
+  distance?: string | null
+  duration?: string | null
+}
+
+
 export async function fetchDermagas(): Promise<Dermaga[] | null> {
-  const result = await api.get<Dermaga[]>('/dermagas')
-  return result.ok ? result.data ?? null : null
+  return api.getOk<Dermaga[]>('/dermagas')
 }
 
 export async function fetchRoutes(): Promise<Route[] | null> {
-  const result = await api.get<Route[]>('/routes')
-  return result.ok ? result.data ?? null : null
+  return api.getOk<Route[]>('/routes')
 }
 export async function createRoute(data: Omit<Route, 'id'>): Promise<string | null> {
   const result = await api.post<{ id: string }>('/routes', data)

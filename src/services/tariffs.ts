@@ -4,18 +4,7 @@
  */
 
 import { api } from './api'
-
-export interface TariffRow {
-  id?: string
-  golongan: string
-  type: string
-  /** Tampilan "Rp x" — selaras dengan TariffRow di admin/components/types */
-  loaded: string
-  loadedNum: number
-  empty: string
-  emptyNum: number
-  desc: string
-}
+import type { TariffRow } from '../pages/admin/components/types'
 
 export interface ServerTariff {
   id: string
@@ -66,9 +55,8 @@ function toPayload(row: TariffRow) {
 
 /** null = server tidak terjangkau */
 export async function fetchTariffs(): Promise<TariffRow[] | null> {
-  const res = await api.get<ServerTariff[]>('/tariffs')
-  if (res.ok && res.data) return res.data.map(toRow)
-  return null
+  const rows = await api.getOk<ServerTariff[]>('/tariffs')
+  return rows ? rows.map(toRow) : null
 }
 
 /** null = gagal. */
@@ -93,8 +81,7 @@ export async function deleteTariff(row: TariffRow): Promise<boolean> {
 
 /** null = tidak terjangkau. */
 export async function fetchRegionTariffs(): Promise<RegionTariffRow[] | null> {
-  const r = await api.get<RegionTariffRow[]>('/region-tariffs')
-  return r.ok && r.data ? r.data : null
+  return api.getOk<RegionTariffRow[]>('/region-tariffs')
 }
 
 /** true = server terima. */

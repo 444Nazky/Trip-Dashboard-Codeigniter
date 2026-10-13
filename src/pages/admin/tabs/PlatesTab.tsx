@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { fetchPlates, createPlate, updatePlate, deletePlate, type PlateRecord, type PlateStatus } from '../../../services/plates'
-import { fetchRegions } from '../../../services/regions'
-import type { Region } from '../components/types'
+import { fetchRegions, type Region } from '../../../services/regions'
 
 interface PlatesTabProps {
   plates: PlateRecord[]

@@ -14,9 +14,9 @@ export interface GeofenceRule {
 
 
 export async function fetchGeofenceRules(): Promise<GeofenceRule[] | null> {
-  const res = await api.get<GeofenceRule[]>('/geofences')
-  if (!res.ok || !res.data) return null
-  return res.data.map(r => ({
+  const rules = await api.getOk<GeofenceRule[]>('/geofences')
+  if (!rules) return null
+  return rules.map(r => ({
     ...r,
     allowedRouteCodes: Array.isArray(r.allowedRouteCodes) ? r.allowedRouteCodes : String(r.allowedRouteCodes ?? '').split(',').filter(Boolean),
     allowedDirections: Array.isArray(r.allowedDirections) ? r.allowedDirections : String(r.allowedDirections ?? '').split(',').filter(Boolean),
@@ -42,15 +42,7 @@ export async function updateGeofenceRule(
   id: string,
   data: Partial<GeofenceRule>
 ): Promise<boolean> {
-  const res = await api.put(`/geofences/${id}`, {
-    ...(data.locationName !== undefined ? { locationName: data.locationName } : {}),
-    ...(data.latitude !== undefined ? { latitude: data.latitude } : {}),
-    ...(data.longitude !== undefined ? { longitude: data.longitude } : {}),
-    ...(data.radiusMeters !== undefined ? { radiusMeters: data.radiusMeters } : {}),
-    ...(data.allowedRouteCodes !== undefined ? { allowedRouteCodes: data.allowedRouteCodes } : {}),
-    ...(data.allowedDirections !== undefined ? { allowedDirections: data.allowedDirections } : {}),
-    ...(data.description !== undefined ? { description: data.description } : {}),
-  })
+  const res = await api.put(`/geofences/${id}`, data)
   return res.ok
 }
 

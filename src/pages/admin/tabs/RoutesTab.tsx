@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { MapPin, Plus, Pencil, Trash2, X, ChevronDown, Link2, ExternalLink, Navigation, Layers } from 'lucide-react'
 import { fetchRoutes, fetchDermagas, createRoute, updateRoute, deleteRoute } from '../../../services/dermagas'
 import { fetchGeofencePointsForRoute, createRouteGeofencePoint, deleteGeofenceRule } from '../../../services/geofences'
-import { parseMapsUrl, resolveMapsShortLink, osmEmbeddedMapUrl, googleMapsLink, type ParsedGeo } from '../../../services/geo'
+import { isShortMapsLink, parseMapsUrl, resolveMapsShortLink, osmEmbeddedMapUrl, googleMapsLink, type ParsedGeo } from '../../../services/geo'
 import type { RouteRow, RouteDermaga, RouteFormState, GeofencePoint } from '../components/types'
 import { emptyRouteForm } from '../components/types'
 
@@ -29,6 +29,12 @@ export function RoutesTab({ serverState, showToast }: RoutesTabProps) {
   /** true → admin membuka kunci input koordinat untuk koreksi manual */
   const [manualCoords, setManualCoords] = useState(false)
   const [currentRouteForGeofence, setCurrentRouteForGeofence] = useState<RouteRow | null>(null)
+  /** Timer debounce resolve short-link (agar tiap ketikan tidak menembak server). */
+  const resolveTimer = useRef<number | null>(null)
+
+  useEffect(() => () => {
+    if (resolveTimer.current !== null) window.clearTimeout(resolveTimer.current)
+  }, [])
 
   const loadRoutes = async () => {
     if (routeState !== 'idle') return
@@ -166,7 +172,7 @@ export function RoutesTab({ serverState, showToast }: RoutesTabProps) {
     if (!trimmed) return null
     let candidate = trimmed
     // Short link perlu diikuti redirect-nya sebelum koordinat bisa dibaca
-    if (/goo\.gl|maps\.app/i.test(trimmed) && !/@|q=|[?&]lat/i.test(trimmed)) {
+    if (isShortMapsLink(trimmed)) {
       setResolvingLink(true)
       const resolved = await resolveMapsShortLink(trimmed)
       setResolvingLink(false)
@@ -191,25 +197,33 @@ export function RoutesTab({ serverState, showToast }: RoutesTabProps) {
     })
     setCoordsFromLink(true)
     setManualCoords(false)
-    setMapsLink('')
+    // Link yang ditempel DIBIARKAN terlihat agar admin bisa memverifikasi dari
+    // mana koordinatnya diambil (dan bisa di-copy ulang bila perlu).
     showToast('Koordinat terisi otomatis dari link Google Maps')
   }
 
-  /** Auto-extract saat paste / onChange — tanpa perlu tombol. */
+  /** Auto-extract saat paste / onChange — tanpa perlu menekan tombol. */
   const handleMapsLinkChanged = (value: string) => {
     setMapsLink(value)
+    if (resolveTimer.current !== null) { window.clearTimeout(resolveTimer.current); resolveTimer.current = null }
     const raw = value.trim()
     if (!raw || !activeGeofence) return
-    // URL penuh dgn koordinat: sinkron — isi seketika
-    const quick = /goo\.gl|maps\.app/i.test(raw) && !/@|q=|[?&]lat/i.test(raw)
-      ? null
-      : parseMapsUrl(raw)
-    if (quick) { applyParsedCoords(quick); return }
-    // Short link / belum jelas: coba resolve async (onChange berikutnya menimpa)
+
+    // 1) URL penuh / teks "lat, lng" yang sudah memuat koordinat → isi seketika.
+    if (!isShortMapsLink(raw)) {
+      const quick = parseMapsUrl(raw)
+      if (quick) { applyParsedCoords(quick); return }
+    }
+
+    // 2) Short link (atau URL tanpa koordinat terbaca) → resolve ke server.
+    //    Ditunda 500 ms supaya mengetik/menempel tidak menembak banyak request.
     if (/^https?:\/\//i.test(raw)) {
-      void extractCoordsFromMapsLink(raw).then(parsed => {
-        if (parsed) applyParsedCoords(parsed)
-      })
+      resolveTimer.current = window.setTimeout(() => {
+        resolveTimer.current = null
+        void extractCoordsFromMapsLink(raw).then(parsed => {
+          if (parsed) applyParsedCoords(parsed)
+        })
+      }, 500)
     }
   }
 

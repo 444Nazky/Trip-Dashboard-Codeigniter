@@ -22,11 +22,7 @@ export interface BackendTrip {
 }
 
 export async function fetchTrips(): Promise<BackendTrip[] | null> {
-  const result = await api.get<BackendTrip[]>('/trips')
-  if (!result.ok || !result.data) {
-    return null
-  }
-  return result.data
+  return api.getOk<BackendTrip[]>('/trips')
 }
 
 // ─── Admin report: trips with full vehicle detail ─────────────────────────────
@@ -122,9 +118,7 @@ function toQuery(f?: ReportFilters): string {
 
 /** Admin-only (GET /reports/trips). Returns null on failure. */
 export async function fetchTripReports(filters?: ReportFilters): Promise<ReportTrip[] | null> {
-  const result = await api.get<ReportTrip[]>(`/reports/trips${toQuery(filters)}`)
-  if (!result.ok || !result.data) return null
-  return result.data
+  return api.getOk<ReportTrip[]>(`/reports/trips${toQuery(filters)}`)
 }
 
 /** Opsi filter laporan (golongan + jenis kendaraan) dari master tarif. */
@@ -134,9 +128,7 @@ export interface ReportFilterOptions {
 }
 
 export async function fetchReportFilters(): Promise<ReportFilterOptions | null> {
-  const result = await api.get<ReportFilterOptions>('/reports/trips/filters')
-  if (!result.ok || !result.data) return null
-  return result.data
+  return api.getOk<ReportFilterOptions>('/reports/trips/filters')
 }
 
 /** Ringkasan angka (trip, unit, pendapatan) untuk kartu metrik dashboard. */
@@ -154,9 +146,7 @@ export async function fetchReportSummary(
   if (startDate) params.set('startDate', startDate)
   if (endDate) params.set('endDate', endDate)
   const qs = params.toString()
-  const result = await api.get<ReportSummary>(`/reports/summary${qs ? `?${qs}` : ''}`)
-  if (!result.ok || !result.data) return null
-  return result.data
+  return api.getOk<ReportSummary>(`/reports/summary${qs ? `?${qs}` : ''}`)
 }
 
 /** Kunci hari (YYYY-MM-DD) dalam zona waktu WIB — dipakai grafik & metrik harian. */

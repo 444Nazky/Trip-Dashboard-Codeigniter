@@ -19,9 +19,7 @@ export interface PlateRecord {
 
 /** Daftar plat terdaftar (admin). null = server tidak terjangkau. */
 export async function fetchPlates(): Promise<PlateRecord[] | null> {
-  const res = await api.get<PlateRecord[]>('/plates')
-  if (res.ok && res.data) return res.data
-  return null
+  return api.getOk<PlateRecord[]>('/plates')
 }
 
 /** Registrasi plat baru (admin). Return id baru atau null. */
@@ -50,9 +48,3 @@ export async function deletePlate(id: string): Promise<boolean> {
   const res = await api.delete(`/plates/${id}`)
   return res.ok
 }
-
-/**
- * Cek plat oleh petugas. Region pos pemeriksaan diambil dari JWT petugas
- * di server; `originRegionId` = region asal kendaraan (untuk plat tak terdaftar).
- * null = server tidak terjangkau / request gagal.
- */

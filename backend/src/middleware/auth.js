@@ -1,6 +1,15 @@
 const jwt = require('jsonwebtoken');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'trip-angkut-secret-key';
+// JWT_SECRET wajib dari environment — TANPA fallback.
+// Fallback literal mengekspos secret yang bisa dipakai untuk forge token.
+const JWT_SECRET = (() => {
+  const s = process.env.JWT_SECRET;
+  if (!s) {
+    console.error('[auth] JWT_SECRET environment variable is required — server cannot start without it');
+    process.exit(1);
+  }
+  return s;
+})();
 
 // Attach req.user / req.officer if the JWT is valid
 function authenticate(req, res, next) {
@@ -20,7 +29,6 @@ function authenticate(req, res, next) {
     };
 
     req.user = ctx;
-    // Back-compat for existing routes that read req.officer.*
     req.officer = ctx;
 
     next();
@@ -37,4 +45,4 @@ function requireAdmin(req, res, next) {
   next();
 }
 
-module.exports = { authenticate, requireAdmin };
+module.exports = { authenticate, requireAdmin, JWT_SECRET };

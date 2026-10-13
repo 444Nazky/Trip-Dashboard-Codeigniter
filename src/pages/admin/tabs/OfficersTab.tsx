@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { Lock, Plus, MoreVertical, Pencil, UserX, Trash2 } from 'lucide-react'
-import { fetchRegions } from '../../../services/regions'
+import { fetchRegions, type Region } from '../../../services/regions'
 import { fetchRoutes, fetchDermagas } from '../../../services/dermagas'
 import { api } from '../../../services/api'
-import type { Officer, BackendOfficerRow, Region, RouteRow, RouteDermaga } from '../components/types'
+import type { Officer, BackendOfficerRow, RouteRow, RouteDermaga } from '../components/types'
 
 interface OfficersTabProps {
   officers: Officer[] 
@@ -109,15 +109,15 @@ export function OfficersTab({ officers, serverState, onSaveOfficers, showToast }
         fetchRegions(),
         fetchRoutes(),
         fetchDermagas(),
-        api.get<BackendOfficerRow[]>('/officers'),
+        api.getOk<BackendOfficerRow[]>('/officers'),
       ]).then(([regs, rts, dms, offs]) => {
         if (!alive) return
         if (regs) setRegions(regs)
         if (rts) setRouteRows(rts as RouteRow[])
         if (dms) setRouteDermagas(dms as RouteDermaga[])
-        if (offs.ok && offs.data) {
-          setBackendOfficers(offs.data)
-          const merged = mergeBackendOfficers(offs.data, officers)
+        if (offs) {
+          setBackendOfficers(offs)
+          const merged = mergeBackendOfficers(offs, officers)
           setLocalOfficers(merged)
           onSaveOfficers(merged)
         }
@@ -154,10 +154,10 @@ export function OfficersTab({ officers, serverState, onSaveOfficers, showToast }
   const findBackendOfficer = (o: { id?: string; name: string }) =>
     backendOfficers.find(b => String(b.id) === String(o.id)) ?? backendOfficers.find(b => b.name === o.name)
 
-  const reloadAndSync = (offsResp: { ok: boolean; data?: BackendOfficerRow[] }) => {
-    if (offsResp.ok && offsResp.data) {
-      const merged = mergeBackendOfficers(offsResp.data, officers)
-      setBackendOfficers(offsResp.data)
+  const reloadAndSync = (offs: BackendOfficerRow[] | null) => {
+    if (offs) {
+      const merged = mergeBackendOfficers(offs, officers)
+      setBackendOfficers(offs)
       setLocalOfficers(merged)
       onSaveOfficers(merged)
     }
@@ -174,7 +174,7 @@ export function OfficersTab({ officers, serverState, onSaveOfficers, showToast }
       dermagaIds: offForm.dermagaIds.length > 0 ? offForm.dermagaIds : undefined,
     })
     if (!res.ok || !res.data) return showToast('Gagal tambah petugas', 'error')
-    await reloadAndSync(await api.get<BackendOfficerRow[]>('/officers'))
+    await reloadAndSync(await api.getOk<BackendOfficerRow[]>('/officers'))
     setOffForm({ name: '', region: 'BADAU', pin: '', device: '', dermagaIds: [] })
     setAddOff(false)
     showToast('Petugas ditambahkan')
@@ -191,7 +191,7 @@ export function OfficersTab({ officers, serverState, onSaveOfficers, showToast }
       const dmIds = editDermagaIds.filter(id => validDm.has(id))
       await api.put(`/officers/${be.id}/dermagas`, { dermagaIds: dmIds })
       if (editOff.pin && editOff.pin.length === 6) await api.put(`/officers/${be.id}/pin`, { pin: editOff.pin })
-      await reloadAndSync(await api.get<BackendOfficerRow[]>('/officers'))
+      await reloadAndSync(await api.getOk<BackendOfficerRow[]>('/officers'))
     }
     setEditOffIdx(null)
     setEditOff(null)
@@ -208,7 +208,7 @@ export function OfficersTab({ officers, serverState, onSaveOfficers, showToast }
     if (be) {
       const res = await api.delete(`/officers/${be.id}`)
       if (!res.ok) return showToast('Gagal hapus', 'error')
-      await reloadAndSync(await api.get<BackendOfficerRow[]>('/officers'))
+      await reloadAndSync(await api.getOk<BackendOfficerRow[]>('/officers'))
     }
     showToast('Petugas dihapus')
   }
@@ -222,7 +222,7 @@ export function OfficersTab({ officers, serverState, onSaveOfficers, showToast }
     if (be) {
       const res = await api.put(`/officers/${be.id}/status`, { isActive: newStatus === 'Aktif' })
       if (!res.ok) return showToast('Gagal sync status', 'error')
-      await reloadAndSync(await api.get<BackendOfficerRow[]>('/officers'))
+      await reloadAndSync(await api.getOk<BackendOfficerRow[]>('/officers'))
     }
     showToast(`Status diubah ke ${newStatus}`)
   }

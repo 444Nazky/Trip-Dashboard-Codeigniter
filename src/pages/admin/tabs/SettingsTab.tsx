@@ -10,11 +10,10 @@ interface SettingsTabProps {
   serverState: 'connecting' | 'online' | 'offline'
   tariffs: unknown[]
   officers: unknown[]
-  localTrips: unknown[]
   showToast: (msg: string, type?: 'success' | 'error') => void
 }
 
-export function SettingsTab({ onLogout, serverState, tariffs, officers, localTrips, showToast }: SettingsTabProps) {
+export function SettingsTab({ onLogout, serverState, tariffs, officers, showToast }: SettingsTabProps) {
   const [theme, setTheme] = useState<AdminTheme>(() => loadTheme())
 
   useEffect(() => {
@@ -138,7 +137,7 @@ export function SettingsTab({ onLogout, serverState, tariffs, officers, localTri
           <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 space-y-3">
             <p className="text-[12px] font-bold text-slate-700 uppercase tracking-wide">Data Lokal</p>
             <p className="text-xs text-slate-600">
-              {tariffs.length} tarif · {officers.length} petugas · {localTrips.length} trip
+              {tariffs.length} tarif · {officers.length} petugas
             </p>
             <button
               onClick={() => {

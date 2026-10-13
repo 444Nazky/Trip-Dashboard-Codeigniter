@@ -4,53 +4,23 @@ import { environment } from '../environments/environment'
 
 const TOKEN_KEY = 'trip.auth.token.v1'
 
-export interface ApiError {
+interface ApiError {
   message: string
   code?: string
 }
 
-export interface ApiResponse<T> {
+interface ApiResponse<T> {
   data?: T
   error?: ApiError
   ok: boolean
 }
-// Detect if running on a REAL mobile device.
-// Penting: window.Capacitor juga ikut terdefinisi di build web (platform 'web'),
-// jadi cek keberadaannya saja akan salah menganggap browser desktop sebagai
-// perangkat fisik → base URL jatuh ke deviceApiBaseUrl (host mati) dan login
-// menggantung. Yang benar: hanya native platform (Android/iOS) atau UA mobile.
-function isMobileDevice(): boolean {
-  // UA mobile → browser di HP/tablet (perlu IP host, bukan localhost)
-  if (/Android|iPhone|iPad|iPod/i.test(navigator.userAgent)) return true
 
-  const cap = (window as any).Capacitor
-  // Hanya native (Android/iOS) yang dianggap perangkat fisik
-  if (cap && typeof cap.isNativePlatform === 'function' && cap.isNativePlatform()) return true
-  if (cap && typeof cap.getPlatform === 'function') {
-    const platform = cap.getPlatform()
-    if (platform === 'android' || platform === 'ios') return true
-  }
-
-  return (window as any).cordova !== undefined
-}
-
-// Get current base URL (user-configurable for physical devices)
-function getBaseUrl(): string {
-  // Use device-specific URL on mobile
-  if (isMobileDevice() && environment.deviceApiBaseUrl) {
-    return environment.deviceApiBaseUrl
-  }
-
+/** Base URL API — sama untuk semua platform. */
+export function getApiBaseUrl(): string {
   return environment.apiBaseUrl
 }
 
-// Allow users to set custom API URL (for physical device testing)
-export function getApiBaseUrl(): string {
-  return getBaseUrl()
-}
-
 class ApiService {
-  private _baseUrl = getBaseUrl()
   private _token: string | null = null
 
   constructor() {
@@ -60,7 +30,6 @@ class ApiService {
     } catch { /* ignore */ }
   }
 
-  get baseUrl() { return this._baseUrl }
   get token() { return this._token }
 
   setToken(token: string | null) {
@@ -94,7 +63,7 @@ class ApiService {
 
       let res: Response
       try {
-        res = await fetch(`${this.baseUrl}${path}`, {
+        res = await fetch(`${environment.apiBaseUrl}${path}`, {
           method,
           headers,
           body: body ? JSON.stringify(body) : undefined,
@@ -118,7 +87,7 @@ class ApiService {
     } catch (err) {
       const aborted = err instanceof DOMException && err.name === 'AbortError'
       const message = aborted
-        ? `Server tidak merespon (12 detik timeout) — periksa API ${this.baseUrl}`
+        ? `Server tidak merespon (12 detik timeout) — periksa API ${environment.apiBaseUrl}`
         : err instanceof Error ? err.message : 'Network error'
       return { ok: false, error: { message } }
     }
@@ -129,7 +98,10 @@ class ApiService {
   put<T>(path: string, body?: unknown) { return this.request<T>('PUT', path, body) }
   delete<T>(path: string) { return this.request<T>('DELETE', path) }
 
-
+  /** GET yang langsung mengembalikan data, atau null bila gagal/kosong. */
+  getOk<T>(path: string): Promise<T | null> {
+    return this.get<T>(path).then(r => (r.ok && r.data ? r.data : null))
+  }
 }
 
 export const api = new ApiService()
