@@ -6,11 +6,12 @@ ENV DB_PATH=/data/trip.db
 ENV UPLOADS_DIR=/data/uploads
 ENV NODE_ENV=production
 
-COPY package*.json ./
+# Copy backend files from repo root context
+COPY backend/package*.json ./
 RUN npm ci --omit=dev
 
-COPY src/ ./src/
-COPY uploads/ ./uploads/
+COPY backend/src/ ./src/
+COPY backend/uploads/ ./uploads/ || true
 
 EXPOSE 8080
 
