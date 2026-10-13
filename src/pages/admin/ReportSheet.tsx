@@ -17,6 +17,8 @@ import {
 import { downloadXlsx } from '../../services/xlsx'
 import { environment } from '../../environments/environment'
 import { resolvePhotoUrl } from './components/PhotoViewer'
+import { fetchGeofenceRules, type GeofenceRule } from '../../services/geofences'
+import { locationDistanceText, nearestGeofence } from '../../services/locationDistance'
 
 const fmtRp = (n: number) => `Rp ${Number(n || 0).toLocaleString('id-ID')}`
 
@@ -33,6 +35,13 @@ const fmtCoords = (lat?: number | null, lng?: number | null) => {
   if (!lat || !lng) return null
   return { lat: Number(lat).toFixed(5), lng: Number(lng).toFixed(5), gmaps: `https://www.google.com/maps?q=${lat},${lng}` }
 }
+
+/**
+ * Sel Lokasi di matrix VEH — sekarang memuat JARAK ke titik geofence terdekat:
+ * { dist: "80m dari SBDZ", lat/lng koordinat foto, gmaps link }. `dist` null
+ * bila geofence belum ada/koordinat invalid — UI memakai fallback koordinat.
+ */
+type LocCell = { dist: string | null; lat: string; lng: string; gmaps: string; tooltip?: string }
 
 const ThumbnailCell = ({ foto_path, no_trip, label }: { foto_path: string | null | undefined; no_trip: string; label?: string }) => {
   const url = fotoUrl(foto_path)
@@ -90,22 +99,24 @@ const AUTO_REFRESH_MS = 15_000
  * Baris kendaraan (SEJAJAR dengan vehHeader 13 kolom):
  * 0 = '#', 1 = No Trip, 2 = Tanggal, 3 = Jam, 4 = Tempat, 5 = No. Polisi,
  * 6 = Unit (label per jenis: "Truk 1", "Mobil 1"), 7 = Jenis, 8 = Golongan,
- * 9 = Kategori, 10 = Tarif, 11 = foto (string|null), 12 = koordinat ({gmaps}|null)
+ * 9 = Kategori, 10 = Tarif, 11 = foto (string|null), 12 = lokasi (LocCell|null)
  */
-interface VehRow extends Array<string | number | { lat: string; lng: string; gmaps: string } | null> {
+interface VehRow extends Array<string | number | LocCell | null> {
   0: number; 1: string; 2: string; 3: string; 4: string; 5: string;
   6: string; 7: string; 8: string; 9: string; 10: number;
   11: string | null;
-  12: { lat: string; lng: string; gmaps: string } | null;
+  12: LocCell | null;
   length: 13;
 }
 
-const asVehRow = (r: [number, string, string, string, string, string, string, string, string, string, number, string | null, { lat: string; lng: string; gmaps: string } | null]): VehRow => r as unknown as VehRow
+const asVehRow = (r: [number, string, string, string, string, string, string, string, string, string, number, string | null, LocCell | null]): VehRow => r as unknown as VehRow
 
 export default function ReportSheet() {
   const [rows, setRows] = useState<ReportTrip[]>([])
   const [filters, setFilters] = useState<ReportFilters>({})
   const [options, setOptions] = useState<ReportFilterOptions>({ golongan: [], vehicleTypes: [] })
+  /** Titik geofence (Master Rute) — untuk menghitung jarak kolom Lokasi. */
+  const [geoRules, setGeoRules] = useState<GeofenceRule[]>([])
   const [state, setState] = useState<LoadState>('loading')
   const [view, setView] = useState<ViewMode>('trip')
   const [lastSync, setLastSync] = useState('')
@@ -125,6 +136,16 @@ export default function ReportSheet() {
     if (opts) setOptions(opts)
     setState('ready')
     setLastSync(new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }))
+  }, [])
+
+  // Titik geofence Master Rute — dimuat sekali, dipakai semua baris untuk menghitung jarak.
+  // Gagal (offline/cfg belum ada) → kolom Lokasi jatuh ke tampilan koordinat (bukan kosong).
+  useEffect(() => {
+    alive.current = true
+    fetchGeofenceRules().then(rules => {
+      if (alive.current && rules) setGeoRules(rules)
+    }).catch(() => null)
+    return () => { alive.current = false }
   }, [])
 
   // Muat pertama + sinkronisasi otomatis 15 detik
@@ -150,12 +171,22 @@ export default function ReportSheet() {
   const vehFlat = useMemo(() => rows.flatMap(t => t.vehicles.map(v => ({ t, v }))), [rows])
   const vehMatrix = useMemo(() => vehFlat.map(({ t, v }, i) => {
     const d = formatReportDateTime(t.created_at)
-    const coords = fmtCoords(v.latitude, v.longitude)
+    const base = fmtCoords(v.latitude, v.longitude)
+    // Kolom Lokasi: "80m dari SBDZ" fungsipi jarak foto→titik geofence terdekat.
+    // Tanpa konfigurasi geofence/koordinat → fallback koordinat mentah.
+    const nd = nearestGeofence({ latitude: v.latitude, longitude: v.longitude }, geoRules)
+    const loc: LocCell | null = base && {
+      dist: locationDistanceText({ latitude: v.latitude, longitude: v.longitude }, geoRules),
+      lat: base.lat,
+      lng: base.lng,
+      gmaps: base.gmaps,
+      tooltip: nd ? `${base.lat}, ${base.lng} · titik: ${nd.pointName} (${nd.pointLat}, ${nd.pointLng})` : `${base.lat}, ${base.lng}`,
+    }
     return asVehRow([i + 1, t.no_trip, d.date, d.time, reportPlace(t), v.no_polisi,
       vehicleUnitLabel(t.vehicles, v), v.vehicle_type,
       v.master_golongan || (v.golongan.length <= 3 ? v.golongan : '-'), v.golongan, v.tariff_amount || 0,
-      v.foto_path, coords])
-  }), [vehFlat])
+      v.foto_path, loc])
+  }), [vehFlat, geoRules])
 
   const totalTrip = rows.length
   const totalUnit = rows.reduce((s, t) => s + (t.vehicle_count || 0), 0)
@@ -171,7 +202,8 @@ export default function ReportSheet() {
     const vehExcelMatrix: (string | number | null)[][] = vehMatrix.map(r => [
       r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], r[8], r[9], r[10],
       fotoUrl(r[11]) || null,
-      r[12] ? r[12].gmaps : null,
+      // Kolom Lokasi: jarak + koordinat foto tetap tersalin agar bisa diverifikasi
+      r[12] ? (r[12].dist || `${r[12].lat}, ${r[12].lng}`) : null,
     ])
     const meta: (string | number | null)[][] = [
       ['Laporan Spreadsheet'],
@@ -193,7 +225,11 @@ export default function ReportSheet() {
     // TSV matrix — flatten kolom kompleks (Foto=objek, Lokasi=objek) ke string
     const tsvRows = matrix.map(r => r.map((cell, ci) => {
       if (view === 'vehicle' && ci === 11) return fotoUrl(cell as string | null) || '-'
-      if (view === 'vehicle' && ci === 12) return ((cell as { lat: string; lng: string; gmaps: string } | null)?.gmaps) || '-'
+      if (view === 'vehicle' && ci === 12) {
+        // TSV: jarak ke titik ("80m dari SBDZ") — koordinat tetap dilink via kolom terpisah di Excel
+        const loc = cell as LocCell | null
+        return loc?.dist || (loc ? `${loc.lat}, ${loc.lng}` : '-')
+      }
       return String(cell ?? '')
     }))
     const tsv = [
@@ -369,21 +405,21 @@ export default function ReportSheet() {
                           </td>
                         )
                       }
-                      // Kolom Lokasi (index 12 di VehRow) — render sebagai tautan maps
+                      // Kolom Lokasi (index 12 di VehRow) — "80m dari SBDZ" + link maps
                       if (view === 'vehicle' && ci === 12) {
-                        const coords = cell as { lat: string; lng: string; gmaps: string } | null
-                        if (!coords) return <td key={ci} className="px-3 py-2 border-b border-slate-100 text-slate-300 italic text-[11px]">-</td>
+                        const loc = cell as LocCell | null
+                        if (!loc) return <td key={ci} className="px-3 py-2 border-b border-slate-100 text-slate-300 italic text-[11px]">-</td>
                         return (
                           <td key={ci} className="px-3 py-2 border-b border-slate-100">
                             <a
-                              href={coords.gmaps}
+                              href={loc.gmaps}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="inline-flex items-center gap-1 text-[11px] text-blue-500 hover:text-blue-700 hover:underline"
-                              title={`${coords.lat}, ${coords.lng}`}
+                              title={loc.tooltip || `${loc.lat}, ${loc.lng}`}
                             >
                               <MapPin size={11} />
-                              {coords.lat}, {coords.lng}
+                              {loc.dist || `${loc.lat}, ${loc.lng}`}
                             </a>
                           </td>
                         )

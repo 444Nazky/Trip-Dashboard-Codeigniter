@@ -4,12 +4,21 @@ import { fetchTrips, fetchTripReports, fetchReportFilters, formatReportDateTime,
 import { downloadXlsx } from '../../../services/xlsx'
 import { CurrencyDisplay } from '../components/CurrencyDisplay'
 import { PhotoViewer, resolvePhotoUrl } from '../components/PhotoViewer'
+import { fetchGeofenceRules, type GeofenceRule } from '../../../services/geofences'
+import { locationDistanceText } from '../../../services/locationDistance'
 
-function vehiclePhotoCaption(trip: ReportTrip, vehicle: ReportTrip['vehicles'][number]): string {
+/** Caption foto — metadata pakai "jarak dari titik" bila geofence tersedia. */
+function vehiclePhotoCaption(
+  trip: ReportTrip,
+  vehicle: ReportTrip['vehicles'][number],
+  geoRules: GeofenceRule[],
+): string {
   const metadata = [
     vehicle.foto_captured_at ? formatReportDateTime(vehicle.foto_captured_at).full : '',
-    typeof vehicle.latitude === 'number' && typeof vehicle.longitude === 'number'
-      ? `${vehicle.latitude.toFixed(5)}, ${vehicle.longitude.toFixed(5)}` : '',
+    // "80m dari SBDZ" bila titik geofence ada; fallback koordinat bila belum
+    locationDistanceText(vehicle, geoRules)
+      || (typeof vehicle.latitude === 'number' && typeof vehicle.longitude === 'number'
+        ? `${vehicle.latitude.toFixed(5)}, ${vehicle.longitude.toFixed(5)}` : ''),
   ].filter(Boolean).join(' · ')
   const unit = vehicleUnitLabel(trip.vehicles, vehicle)
   return `${trip.no_trip} · ${unit} · ${vehicle.no_polisi} · ${vehicle.vehicle_type} · ${vehicle.golongan}${metadata ? ` · ${metadata}` : ''}`
@@ -30,6 +39,8 @@ export function ReportsTab({ onServerTripsChange, showToast, revealed, onToggleR
   const [reportFilters, setReportFilters] = useState<ReportFilters>({})
   const [filterOptions, setFilterOptions] = useState<{ golongan: string[]; vehicleTypes: string[] }>({ golongan: [], vehicleTypes: [] })
   const [viewingPhotos, setViewingPhotos] = useState<{ id: string; url: string; caption?: string }[] | null>(null)
+  /** Titik geofence Master Rute — untuk teks "<jarak>m dari <titik>" di caption foto. */
+  const [geoRules, setGeoRules] = useState<GeofenceRule[]>([])
 
   const loadReports = async (filters?: ReportFilters) => {
     setReportState('loading')
@@ -47,6 +58,8 @@ export function ReportsTab({ onServerTripsChange, showToast, revealed, onToggleR
         if (trips) onServerTripsChange(trips)
       })
       void loadReports()
+      // Muat titik geofence sekali — untuk "<jarak>m dari <titik>" di caption foto
+      fetchGeofenceRules().then(rules => { if (rules) setGeoRules(rules) }).catch(() => null)
     }
   }, [reportState])
 
@@ -330,7 +343,7 @@ export function ReportsTab({ onServerTripsChange, showToast, revealed, onToggleR
                       ...t.vehicles.filter(v => v.foto_path).map(v => ({
                         id: `vehicle-${v.id}`,
                         url: v.foto_path as string,
-                        caption: vehiclePhotoCaption(t, v),
+                        caption: vehiclePhotoCaption(t, v, geoRules),
                       })),
                     ])
                     setViewingPhotos(photos)
@@ -425,7 +438,7 @@ export function ReportsTab({ onServerTripsChange, showToast, revealed, onToggleR
                                           onClick={() => setViewingPhotos([{
                                             id: `vehicle-${v.id}`,
                                             url: v.foto_path!,
-                                            caption: vehiclePhotoCaption(t, v),
+                                            caption: vehiclePhotoCaption(t, v, geoRules),
                                           }])}
                                           className="block w-16 h-12 sm:w-20 sm:h-14 overflow-hidden rounded-lg bg-slate-100 ring-1 ring-slate-200 hover:ring-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
                                           aria-label={`Lihat foto kendaraan ${v.no_polisi}`}
