@@ -1,3 +1,4 @@
+# Build: 2024-10-13 force-rebuild timestamp to invalidate cache
 FROM node:22.22.3-bookworm-slim
 
 WORKDIR /app
