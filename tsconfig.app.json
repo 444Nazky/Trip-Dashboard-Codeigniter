@@ -1,9 +1,0 @@
-/* Admin/React pages need @types/react to resolve alongside Angular. */
-{
-  "extends": "./tsconfig.json",
-  "compilerOptions": {
-    "outDir": "./out-tsc/app"
-  },
-  "files": ["src/main.tsx"],
-  "include": ["src/**/*.ts"]
-}
