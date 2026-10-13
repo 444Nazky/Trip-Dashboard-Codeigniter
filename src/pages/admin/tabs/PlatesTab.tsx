@@ -4,12 +4,11 @@ import { fetchRegions, type Region } from '../../../services/regions'
 
 interface PlatesTabProps {
   plates: PlateRecord[]
-  serverState: 'connecting' | 'online' | 'offline'
   onPlatesChange: (p: PlateRecord[]) => void
   showToast: (msg: string, type?: 'success' | 'error') => void
 }
 
-export function PlatesTab({ plates, serverState, onPlatesChange, showToast }: PlatesTabProps) {
+export function PlatesTab({ plates, onPlatesChange, showToast }: PlatesTabProps) {
   const [regions, setRegions] = useState<Region[]>([])
   const [plateForm, setPlateForm] = useState({ plate: '', owner: '', originRegionId: '', status: 'internal' as PlateStatus })
   const [editPlateId, setEditPlateId] = useState<string | null>(null)

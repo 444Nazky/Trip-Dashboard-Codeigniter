@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Lock, Check, X } from 'lucide-react'
 import { api } from '../../services/api'
-import { saveAdminCredentials, clearAdminCredentials, logout as endSession } from '../../services/auth'
+import { saveAdminCredentials } from '../../services/auth'
 
 interface ChangePasswordProps {
   onLogout?: () => void
@@ -16,13 +16,6 @@ export function ChangePasswordSection({ onLogout, showToast }: ChangePasswordPro
   const [cur, setCur] = useState('')
   const [next, setNext] = useState('')
   const [confirm, setConfirm] = useState('')
-
-  const logout = () => {
-    clearAdminCredentials()
-    endSession?.()
-    onLogout?.()
-    window.location.href = '/'
-  }
 
   const handle = async () => {
     setErr(null)

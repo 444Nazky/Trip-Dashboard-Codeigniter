@@ -1,4 +1,4 @@
-import { Settings, LogOut, Sun, Moon } from 'lucide-react'
+import { Sun, Moon } from 'lucide-react'
 import { ZOOM_OPTIONS, ACCENT_OPTIONS, DEFAULT_THEME, loadTheme, saveTheme, applyTheme, type AdminTheme } from '../../../services/theme'
 import { useState, useEffect } from 'react'
 import { Check } from 'lucide-react'

@@ -11,7 +11,8 @@
     "build": "vite build",
     "watch": "vite build --watch",
     "preview": "vite preview",
-    "lint": "eslint src"
+    "lint": "eslint src",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "lucide-react": "^1.47.0",

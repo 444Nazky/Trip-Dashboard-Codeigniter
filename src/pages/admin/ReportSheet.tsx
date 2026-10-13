@@ -6,6 +6,10 @@ import {
   fetchReportFilters,
   formatReportDateTime,
   vehicleUnitLabel,
+  reportPlace,
+  reportAsal,
+  reportTujuan,
+  reportRentang,
   type ReportTrip,
   type ReportFilters,
   type ReportFilterOptions,
@@ -133,16 +137,12 @@ export default function ReportSheet() {
 
   const apply = (patch: ReportFilters) => setFilters(prev => ({ ...prev, ...patch }))
 
-  const place = (t: ReportTrip) => (t.region_name ? `${t.region_name}${t.region_code ? ` (${t.region_code})` : ''}` : '-')
-  const asal = (t: ReportTrip) => (t.route_from_name ? `${t.route_from_name} (${t.route_from})` : t.route_from || '-')
-  const tujuan = (t: ReportTrip) => (t.route_to_name ? `${t.route_to_name} (${t.route_to})` : t.route_to || '-')
-
   const tripHeader = ['#', 'No Trip', 'Tanggal', 'Jam (WIB)', 'Tempat / Wilayah', 'Rute Asal', 'Rute Tujuan', 'Petugas', 'Muatan', 'Unit', 'Pendapatan (Rp)']
   const vehHeader = ['#', 'No Trip', 'Tanggal', 'Jam (WIB)', 'Tempat / Wilayah', 'No. Polisi', 'Unit', 'Jenis Kendaraan', 'Golongan', 'Kategori', 'Tarif (Rp)', 'Foto', 'Lokasi']
 
   const tripMatrix = useMemo(() => rows.map((t, i) => {
     const d = formatReportDateTime(t.created_at)
-    return [i + 1, t.no_trip, d.date, d.time, place(t), asal(t), tujuan(t),
+    return [i + 1, t.no_trip, d.date, d.time, reportPlace(t), reportAsal(t), reportTujuan(t),
       t.officer_name || '-', t.status_muatan === 'muatan' ? 'Ada Muatan' : 'Kosong',
       t.vehicle_count || 0, t.trip_revenue || 0]
   }), [rows])
@@ -151,7 +151,7 @@ export default function ReportSheet() {
   const vehMatrix = useMemo(() => vehFlat.map(({ t, v }, i) => {
     const d = formatReportDateTime(t.created_at)
     const coords = fmtCoords(v.latitude, v.longitude)
-    return asVehRow([i + 1, t.no_trip, d.date, d.time, place(t), v.no_polisi,
+    return asVehRow([i + 1, t.no_trip, d.date, d.time, reportPlace(t), v.no_polisi,
       vehicleUnitLabel(t.vehicles, v), v.vehicle_type,
       v.master_golongan || (v.golongan.length <= 3 ? v.golongan : '-'), v.golongan, v.tariff_amount || 0,
       v.foto_path, coords])
@@ -176,7 +176,7 @@ export default function ReportSheet() {
     const meta: (string | number | null)[][] = [
       ['Laporan Spreadsheet'],
       ['Dicetak', now.toLocaleString('id-ID')],
-      ['Rentang Tanggal', filters.startDate || filters.endDate ? `${filters.startDate || 'Awal'} s/d ${filters.endDate || 'Akhir'}` : 'Semua tanggal'],
+      ['Rentang Tanggal', reportRentang(filters)],
       ['Filter Golongan', filters.golongan || 'Semua'],
       ['Filter Jenis Kendaraan', filters.vehicleType || 'Semua'],
       ['Sinkron Terakhir', lastSync],

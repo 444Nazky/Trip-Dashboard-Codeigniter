@@ -80,6 +80,8 @@ export function OverviewTab({
           amount={dashSummary?.totalRevenue ?? 0}
           sub="tarif eksternal tercatat"
           Icon={Wallet}
+          revealed={revealed}
+          onToggleReveal={onToggleReveal}
         />
         <MetricCard
           label="Unit Hari Ini"
@@ -154,12 +156,16 @@ function MetricCard({
   amount,
   sub,
   Icon,
+  revealed = false,
+  onToggleReveal = () => {},
 }: {
   label: string
   val?: string
   amount?: number
   sub: string
   Icon: React.ComponentType<{ size?: number }>
+  revealed?: boolean
+  onToggleReveal?: () => void
 }) {
   return (
     <div className="p-5 border-r border-slate-100 last:border-r-0">

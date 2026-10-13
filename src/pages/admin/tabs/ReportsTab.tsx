@@ -1,6 +1,6 @@
 import { Fragment, useState, useEffect } from 'react'
 import { Camera, ChevronRight, Download, ExternalLink, Eye, EyeOff, Table2 } from 'lucide-react'
-import { fetchTrips, fetchTripReports, fetchReportFilters, formatReportDateTime, dayKeyWib, vehicleUnitLabel, type BackendTrip, type ReportTrip, type ReportFilters } from '../../../services/trips'
+import { fetchTrips, fetchTripReports, fetchReportFilters, formatReportDateTime, dayKeyWib, vehicleUnitLabel, reportPlace, reportAsal, reportTujuan, reportRentang, type BackendTrip, type ReportTrip, type ReportFilters } from '../../../services/trips'
 import { downloadXlsx } from '../../../services/xlsx'
 import { CurrencyDisplay } from '../components/CurrencyDisplay'
 import { PhotoViewer, resolvePhotoUrl } from '../components/PhotoViewer'
@@ -16,8 +16,6 @@ function vehiclePhotoCaption(trip: ReportTrip, vehicle: ReportTrip['vehicles'][n
 }
 
 interface ReportsTabProps {
-  serverState: 'connecting' | 'online' | 'offline'
-  serverTrips: BackendTrip[]
   onServerTripsChange: (t: BackendTrip[]) => void
   showToast: (msg: string, type?: 'success' | 'error') => void
   revealed: boolean
@@ -25,7 +23,7 @@ interface ReportsTabProps {
   baseUrl?: string
 }
 
-export function ReportsTab({ serverState, serverTrips, onServerTripsChange, showToast, revealed, onToggleReveal, baseUrl = '' }: ReportsTabProps) {
+export function ReportsTab({ onServerTripsChange, showToast, revealed, onToggleReveal, baseUrl = '' }: ReportsTabProps) {
   const [reportTrips, setReportTrips] = useState<ReportTrip[]>([])
   const [reportState, setReportState] = useState<'idle' | 'loading' | 'ready' | 'offline'>('idle')
   const [openTripId, setOpenTripId] = useState<string | null>(null)
@@ -84,12 +82,7 @@ export function ReportsTab({ serverState, serverTrips, onServerTripsChange, show
     const stamped = formatReportDateTime(now.toISOString().slice(0, 19).replace('T', ' '), { withSeconds: true })
     const dateSlug = now.toISOString().slice(0, 10)
     const header = ['No Trip', 'Tanggal', 'Jam (WIB)', 'Tempat / Wilayah', 'Rute Asal', 'Rute Tujuan', 'Rute', 'Petugas', 'Status Muatan', 'Kategori', 'Jumlah Unit', 'Total Tarif (Rp)']
-    const rentang = reportFilters.startDate || reportFilters.endDate
-      ? `${reportFilters.startDate || 'Awal'} s/d ${reportFilters.endDate || 'Akhir'}`
-      : 'Semua tanggal'
-    const place = (t: ReportTrip) => t.region_name ? `${t.region_name}${t.region_code ? ` (${t.region_code})` : ''}` : '-'
-    const asal = (t: ReportTrip) => t.route_from ? `${t.route_from_name ? `${t.route_from_name} (` : ''}${t.route_from}${t.route_from_name ? ')' : ''}` : '-'
-    const tujuan = (t: ReportTrip) => t.route_to ? `${t.route_to_name ? `${t.route_to_name} (` : ''}${t.route_to}${t.route_to_name ? ')' : ''}` : '-'
+    const rentang = reportRentang(reportFilters)
 
     // Sheet 1 — ringkasan trip
     const tripRows: (string | number | null)[][] = [
@@ -103,7 +96,7 @@ export function ReportsTab({ serverState, serverTrips, onServerTripsChange, show
       header,
       ...reportTrips.map(t => {
         const d = formatReportDateTime(t.created_at)
-        return [t.no_trip, d.date, d.time, place(t), asal(t), tujuan(t),
+        return [t.no_trip, d.date, d.time, reportPlace(t), reportAsal(t), reportTujuan(t),
           `${t.route_from || '-'} → ${t.route_to || '-'}`, t.officer_name || '-',
           t.status_muatan === 'muatan' ? 'Ada Muatan' : 'Kosong',
           t.keterangan && t.keterangan !== '-' ? t.keterangan : '-',
@@ -119,7 +112,7 @@ export function ReportsTab({ serverState, serverTrips, onServerTripsChange, show
       ['No Trip', 'Tanggal', 'Jam (WIB)', 'Tempat / Wilayah', 'No. Polisi', 'Jenis Kendaraan', 'Golongan', 'Kategori', 'Beban', 'Tarif (Rp)'],
       ...reportTrips.flatMap(t => {
         const d = formatReportDateTime(t.created_at)
-        return t.vehicles.map(v => [t.no_trip, d.date, d.time, place(t), v.no_polisi, v.vehicle_type,
+        return t.vehicles.map(v => [t.no_trip, d.date, d.time, reportPlace(t), v.no_polisi, v.vehicle_type,
           v.master_golongan || (v.golongan.length <= 3 ? v.golongan : '-'), v.golongan,
           v.has_load ? 'Ada Muatan' : 'Kosong', v.tariff_amount || 0])
       }),

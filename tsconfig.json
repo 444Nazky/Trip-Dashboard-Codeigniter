@@ -1,6 +1,5 @@
 {
   "compilerOptions": {
-    "rootDir": "./src",
     "outDir": "./out-tsc",
     "forceConsistentCasingInFileNames": true,
     "strict": true,

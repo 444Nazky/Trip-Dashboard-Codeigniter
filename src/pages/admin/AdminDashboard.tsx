@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Truck, LayoutGrid, Table2, Hash, Users, BarChart2, Settings, LogOut, Check, X, MapPin } from 'lucide-react'
-import { fetchTariffs, fetchRegionTariffs } from '../../services/tariffs'
-import { fetchRegions, type Region } from '../../services/regions'
-import { fetchPlates } from '../../services/plates'
+import { LayoutGrid, Table2, Hash, Users, BarChart2, Settings, LogOut, MapPin } from 'lucide-react'
+import { fetchTariffs } from '../../services/tariffs'
 import { fetchTrips, fetchReportSummary, dayKeyWib } from '../../services/trips'
 import { ensureAdminSession } from '../../services/auth'
 import { api } from '../../services/api'
@@ -34,7 +32,6 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [tab, setTab] = useState<AdminTab>('overview')
   const [serverState, setServerState] = useState<'connecting' | 'online' | 'offline'>('connecting')
   const [serverTrips, setServerTrips] = useState<BackendTrip[]>([])
-  const [regions, setRegions] = useState<Region[]>([])
   const [plates, setPlates] = useState<PlateRecord[]>([])
   const [dashSummary, setDashSummary] = useState<{ totalTrips: number; totalRevenue: number; totalVehicles: number } | null>(null)
   const [dashAt, setDashAt] = useState('')
@@ -88,10 +85,9 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
       }
       setAuthDenied(false)
 
-      const [tarr, regn, tri] = await Promise.all([fetchTariffs(), fetchRegions(), fetchTrips()])
+      const [tarr, tri] = await Promise.all([fetchTariffs(), fetchTrips()])
       if (!alive) return
       if (tarr !== null && tarr.length > 0) setTariffs(tarr)
-      if (regn) setRegions(regn)
       if (tri !== null) setServerTrips(tri)
 
       const offs = await api.getOk<BackendOfficerRow[]>('/officers')
@@ -208,20 +204,18 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
           {tab === 'plates' && (
             <PlatesTab
               plates={plates}
-              serverState={serverState}
               onPlatesChange={setPlates}
               showToast={showToast}
             />
           )}
 
           {tab === 'routes' && (
-            <RoutesTab serverState={serverState} showToast={showToast} />
+            <RoutesTab showToast={showToast} />
           )}
 
           {tab === 'officers' && (
             <OfficersTab
               officers={officers}
-              serverState={serverState}
               onSaveOfficers={setOfficers}
               showToast={showToast}
             />
@@ -229,8 +223,6 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
 
           {tab === 'reports' && (
             <ReportsTab
-              serverState={serverState}
-              serverTrips={serverTrips}
               onServerTripsChange={setServerTrips}
               showToast={showToast}
               revealed={revealed}
@@ -250,6 +242,14 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
           )}
         </div>
       </div>
+
+      {toast && (
+        <div className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl text-sm font-semibold shadow-lg ${
+          toast.type === 'error' ? 'bg-red-600 text-white' : 'bg-slate-900 text-white'
+        }`}>
+          {toast.msg}
+        </div>
+      )}
     </div>
   )
 }

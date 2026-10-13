@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { MapPin, Plus, Pencil, Trash2, X, ChevronDown, Link2, ExternalLink, Navigation, Layers } from 'lucide-react'
+import { MapPin, Plus, Pencil, Trash2, X, Link2, ExternalLink } from 'lucide-react'
 import { fetchRoutes, fetchDermagas, createRoute, updateRoute, deleteRoute } from '../../../services/dermagas'
 import { fetchGeofencePointsForRoute, createRouteGeofencePoint, updateGeofenceRule, deleteGeofenceRule } from '../../../services/geofences'
 import { isShortMapsLink, parseMapsUrl, resolveMapsShortLink, osmEmbeddedMapUrl, googleMapsLink, type ParsedGeo } from '../../../services/geo'
@@ -7,11 +7,10 @@ import type { RouteRow, RouteDermaga, RouteFormState, GeofencePoint } from '../c
 import { emptyRouteForm } from '../components/types'
 
 interface RoutesTabProps {
-  serverState: 'connecting' | 'online' | 'offline'
   showToast: (msg: string, type?: 'success' | 'error') => void
 }
 
-export function RoutesTab({ serverState, showToast }: RoutesTabProps) {
+export function RoutesTab({ showToast }: RoutesTabProps) {
   const [routeRows, setRouteRows] = useState<RouteRow[]>([])
   const [routeDermagas, setRouteDermagas] = useState<RouteDermaga[]>([])
   const [routeState, setRouteState] = useState<'idle' | 'loading' | 'ready' | 'offline'>('idle')

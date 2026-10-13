@@ -7,7 +7,6 @@ import type { Officer, BackendOfficerRow, RouteRow, RouteDermaga } from '../comp
 
 interface OfficersTabProps {
   officers: Officer[] 
-  serverState: 'connecting' | 'online' | 'offline'
   onSaveOfficers: (o: Officer[]) => void
   showToast: (msg: string, type?: 'success' | 'error') => void
 }
@@ -83,7 +82,7 @@ function ActionMenu({ onEdit, onToggle, onDelete, isActive }: { onEdit: () => vo
   )
 }
 
-export function OfficersTab({ officers, serverState, onSaveOfficers, showToast }: OfficersTabProps) {
+export function OfficersTab({ officers, onSaveOfficers, showToast }: OfficersTabProps) {
 
   
 

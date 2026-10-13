@@ -187,3 +187,28 @@ export function formatReportDateTime(
   }).replace(/\./g, ':')
   return { date, time, full: `${date} · ${time} WIB` }
 }
+/** Label tempat/wilayah baris laporan — dipakai ReportSheet & ReportsTab. */
+export function reportPlace(t: ReportTrip): string {
+  return t.region_name ? `${t.region_name}${t.region_code ? ` (${t.region_code})` : ''}` : '-'
+}
+
+/** "Nama (KODE)" bila nama tersedia, hanya KODE bila tidak, "-" bila keduanya kosong. */
+function placePair(name?: string | null, code?: string | null): string {
+  if (name) return code ? `${name} (${code})` : name
+  return code || '-'
+}
+
+export function reportAsal(t: ReportTrip): string {
+  return placePair(t.route_from_name, t.route_from)
+}
+
+export function reportTujuan(t: ReportTrip): string {
+  return placePair(t.route_to_name, t.route_to)
+}
+
+/** Rentang tanggal filter untuk header ekspor ("2026-01-01 s/d 2026-01-31"). */
+export function reportRentang(f: ReportFilters): string {
+  return f.startDate || f.endDate
+    ? `${f.startDate || 'Awal'} s/d ${f.endDate || 'Akhir'}`
+    : 'Semua tanggal'
+}
