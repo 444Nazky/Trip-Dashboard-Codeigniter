@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { MapPin, Plus, Pencil, Trash2, X, ChevronDown, Link2, ExternalLink, Navigation, Layers } from 'lucide-react'
 import { fetchRoutes, fetchDermagas, createRoute, updateRoute, deleteRoute } from '../../../services/dermagas'
-import { fetchGeofencePointsForRoute, createRouteGeofencePoint, deleteGeofenceRule } from '../../../services/geofences'
+import { fetchGeofencePointsForRoute, createRouteGeofencePoint, updateGeofenceRule, deleteGeofenceRule } from '../../../services/geofences'
 import { isShortMapsLink, parseMapsUrl, resolveMapsShortLink, osmEmbeddedMapUrl, googleMapsLink, type ParsedGeo } from '../../../services/geo'
 import type { RouteRow, RouteDermaga, RouteFormState, GeofencePoint } from '../components/types'
 import { emptyRouteForm } from '../components/types'
@@ -285,7 +285,6 @@ export function RoutesTab({ serverState, showToast }: RoutesTabProps) {
 
     if (id) {
       // Update existing
-      const { updateGeofenceRule } = await import('../../../services/geofences')
       const ok = await updateGeofenceRule(id, data)
       if (!ok) {
         showToast('Gagal update titik geofence', 'error')

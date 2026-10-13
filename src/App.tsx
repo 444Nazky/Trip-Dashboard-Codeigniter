@@ -1,17 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import AdminDashboard from './pages/admin/AdminDashboard'
 import LoginPage from './pages/LoginPage'
-import { AppProvider, AUTH_EVENT, useApp } from './pages/store'
+import { AUTH_EVENT, logout } from './services/auth'
 import { ensureAdminSession } from './services/auth'
 
-// ── Build detection ─────────────────────────────────────────────────────────
-
-/** Admin build ditandai atribut `data-admin` di <html>. MobileApp di-stub saja karena admin bundle tidak butuh mobile screens. */
-/** Sinkronisasi LoginPage → Shell: bersihkan sesi tersimpan. */
-// ── Shell: guard utama admin build. Hanya mengenali sesi administrator murni. ──
+// ── Shell: guard utama admin build. ──────────────────────────────────────────
 function Shell() {
   const [status, setStatus] = useState<'loading' | 'admin' | 'login'>('loading')
-  const { logout } = useApp()
 
   const validate = useCallback(async () => {
     setStatus('loading')
@@ -48,9 +43,5 @@ function Shell() {
 }
 
 export default function App() {
-  return (
-    <AppProvider>
-      <Shell />
-    </AppProvider>
-  )
+  return <Shell />
 }

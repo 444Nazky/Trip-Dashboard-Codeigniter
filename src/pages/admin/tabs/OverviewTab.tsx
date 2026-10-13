@@ -10,6 +10,8 @@ interface OverviewTabProps {
   activeOfficerCount: number
   officers: { status: string }[]
   serverState: 'connecting' | 'online' | 'offline'
+  revealed: boolean
+  onToggleReveal: () => void
   onRefresh: () => void
   onOpenReports: () => void
 }
@@ -21,6 +23,8 @@ export function OverviewTab({
   activeOfficerCount,
   officers,
   serverState,
+  revealed,
+  onToggleReveal,
   onRefresh,
   onOpenReports,
 }: OverviewTabProps) {
@@ -164,7 +168,7 @@ function MetricCard({
         <span className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center"><Icon size={14} /></span>
       </div>
       {amount !== undefined ? (
-        <CurrencyDisplay amount={amount} className="text-2xl font-black text-slate-900" />
+        <CurrencyDisplay revealed={revealed} onToggleReveal={onToggleReveal} amount={amount} className="text-2xl font-black text-slate-900" />
       ) : (
         <p className="text-2xl font-black text-slate-900 tabular-nums truncate">{val}</p>
       )}

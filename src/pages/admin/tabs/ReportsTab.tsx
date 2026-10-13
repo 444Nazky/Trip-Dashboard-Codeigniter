@@ -2,7 +2,7 @@ import { Fragment, useState, useEffect } from 'react'
 import { Camera, ChevronRight, Download, ExternalLink, Eye, EyeOff, Table2 } from 'lucide-react'
 import { fetchTrips, fetchTripReports, fetchReportFilters, formatReportDateTime, dayKeyWib, vehicleUnitLabel, type BackendTrip, type ReportTrip, type ReportFilters } from '../../../services/trips'
 import { downloadXlsx } from '../../../services/xlsx'
-import { CurrencyDisplay, useCurrencyReveal } from '../components/CurrencyDisplay'
+import { CurrencyDisplay } from '../components/CurrencyDisplay'
 import { PhotoViewer, resolvePhotoUrl } from '../components/PhotoViewer'
 
 function vehiclePhotoCaption(trip: ReportTrip, vehicle: ReportTrip['vehicles'][number]): string {
@@ -20,11 +20,12 @@ interface ReportsTabProps {
   serverTrips: BackendTrip[]
   onServerTripsChange: (t: BackendTrip[]) => void
   showToast: (msg: string, type?: 'success' | 'error') => void
+  revealed: boolean
+  onToggleReveal: () => void
   baseUrl?: string
 }
 
-export function ReportsTab({ serverState, serverTrips, onServerTripsChange, showToast, baseUrl = '' }: ReportsTabProps) {
-  const { revealed, toggle } = useCurrencyReveal()
+export function ReportsTab({ serverState, serverTrips, onServerTripsChange, showToast, revealed, onToggleReveal, baseUrl = '' }: ReportsTabProps) {
   const [reportTrips, setReportTrips] = useState<ReportTrip[]>([])
   const [reportState, setReportState] = useState<'idle' | 'loading' | 'ready' | 'offline'>('idle')
   const [openTripId, setOpenTripId] = useState<string | null>(null)
@@ -243,7 +244,7 @@ export function ReportsTab({ serverState, serverTrips, onServerTripsChange, show
           </div>
           <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm text-center">
             <p className="text-slate-400 text-[11px] font-semibold uppercase">Pendapatan</p>
-            <CurrencyDisplay amount={totalRevenue} className="text-2xl font-black text-slate-900 mt-1" />
+            <CurrencyDisplay revealed={revealed} onToggleReveal={onToggleReveal} amount={totalRevenue} className="text-2xl font-black text-slate-900 mt-1" />
           </div>
         </div>
       )}
@@ -321,7 +322,7 @@ export function ReportsTab({ serverState, serverTrips, onServerTripsChange, show
             <tr className="bg-slate-50">
               <th colSpan={9} className="px-4 py-3 border-b border-slate-200">
                 <div className="flex justify-end gap-2">
-                  <button onClick={toggle}
+                  <button onClick={onToggleReveal}
                     className={`px-3.5 py-2 rounded-lg border font-semibold text-sm flex items-center gap-2 ${revealed ? 'border-blue-500 text-blue-600 bg-white' : 'border-slate-200 text-slate-600 bg-white hover:bg-slate-50'}`}>
                     {revealed ? <EyeOff size={15} /> : <Eye size={15} />}
                     {revealed ? 'Hide' : 'Show'} Nominal
@@ -386,7 +387,7 @@ export function ReportsTab({ serverState, serverTrips, onServerTripsChange, show
                     </td>
                     <td className="px-3 py-2.5 text-right tabular-nums">{t.vehicle_count}</td>
                     <td className="px-4 py-2.5 text-right">
-                      <CurrencyDisplay amount={t.trip_revenue || 0} />
+                      <CurrencyDisplay revealed={revealed} onToggleReveal={onToggleReveal} amount={t.trip_revenue || 0} />
                     </td>
                     <td className="px-2 py-2.5 text-center text-slate-400"><ChevronRight size={14} className="mx-auto" /></td>
                   </tr>
@@ -448,7 +449,7 @@ export function ReportsTab({ serverState, serverTrips, onServerTripsChange, show
                                   <td className="p-3">{v.vehicle_type}</td>
                                   <td className="p-3"><span className={`px-2 py-1 rounded text-[10px] font-semibold border ${v.golongan === 'Internal' ? 'border-slate-800 text-slate-800' : v.golongan === 'Eksternal' ? 'border-slate-400 text-slate-600' : 'border-slate-200 text-slate-500'}`}>{v.golongan}</span></td>
                                   <td className="p-3">{v.has_load ? 'Ada Muatan' : 'Kosong'}</td>
-                                  <td className="p-3 text-right font-bold"><CurrencyDisplay amount={v.tariff_amount || 0} /></td>
+                                  <td className="p-3 text-right font-bold"><CurrencyDisplay revealed={revealed} onToggleReveal={onToggleReveal} amount={v.tariff_amount || 0} /></td>
                                 </tr>
                               ))}
                             </tbody>
@@ -468,7 +469,7 @@ export function ReportsTab({ serverState, serverTrips, onServerTripsChange, show
                 Total {totalTrip} trip · {totalUnit} unit
               </td>
               <td className="px-4 py-3 border-t-2 border-slate-300 text-right">
-                <CurrencyDisplay amount={totalRevenue} className="text-emerald-700 font-black" />
+                <CurrencyDisplay revealed={revealed} onToggleReveal={onToggleReveal} amount={totalRevenue} className="text-emerald-700 font-black" />
               </td>
               <td />
             </tr>

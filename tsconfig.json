@@ -1,9 +1,7 @@
-/* To learn more about this file see: https://angular.io/config/tsconfig. */
 {
-  "compileOnSave": false,
   "compilerOptions": {
     "rootDir": "./src",
-    "outDir": "./dist/out-tsc",
+    "outDir": "./out-tsc",
     "forceConsistentCasingInFileNames": true,
     "strict": true,
     "noImplicitOverride": true,
@@ -12,29 +10,19 @@
     "noFallthroughCasesInSwitch": true,
     "sourceMap": true,
     "declaration": false,
-    "experimentalDecorators": true,
     "moduleResolution": "bundler",
-    "importHelpers": true,
     "target": "es2022",
-    "module": "es2020",
-    "lib": [
-      "es2022",
-      "dom"
-    ],
+    "module": "esnext",
+    "lib": ["es2022", "dom", "dom.iterable"],
     "skipLibCheck": true,
-    "useDefineForClassFields": false,
+    "isolatedModules": true,
     "jsx": "react-jsx",
     "jsxImportSource": "react",
     "allowJs": true,
     "allowSyntheticDefaultImports": true,
-    "esModuleInterop": true
+    "esModuleInterop": true,
+    "types": ["vite/client"]
   },
-  "angularCompilerOptions": {
-    "enableI18nLegacyMessageIdFormat": false,
-    "strictInjectionParameters": true,
-    "strictInputAccessModifiers": true,
-    "strictTemplates": true
-  },
-  "include": ["src/**/*.ts", "src/**/*.tsx"],
-  "exclude": ["node_modules"]
+  "include": ["src/**/*.ts", "src/**/*.tsx", "vite.config.ts"],
+  "exclude": ["node_modules", "www"]
 }

@@ -85,3 +85,5 @@ node_modules/
 /.angular/
 /admin-ci/*
 !/admin-ci/index.php
+
+/out-tsc/

@@ -497,24 +497,13 @@ function initialize() {
       FOREIGN KEY (vehicle_id) REFERENCES vehicles(id)
     )
   `);
-
-  seedData();
 }
 
 function seedData() {
-  const result = db.prepare('SELECT COUNT(*) as count FROM regions').get();
+  // Region sudah diisi ensureSpecRegions() — di sini hanya tarif default.
+  const result = db.prepare('SELECT COUNT(*) as count FROM tariffs').get();
   if (result.count > 0) return;
 
-  // Seed wilayah operasional (Revisi #3). Dermaga, rute dua arah, petugas
-  // contoh, dan password wilayah dibuat oleh ensureSpecRegions().
-  const insertRegion = db.prepare('INSERT INTO regions (id, name, code, password) VALUES (?, ?, ?, ?)');
-  for (const w of SPEC_WILAYAH) {
-    insertRegion.run(randomUUID(), w.name, w.code, bcrypt.hashSync(regionDefaultPassword(w.code), 10));
-  }
-
-  ensureSpecRegions();
-
-  // Seed tariffs
   const tariffs = [
     { id: randomUUID(), golongan: 'I', vehicle_type: 'Motor', loaded_tariff: 15000, empty_tariff: 8000 },
     { id: randomUUID(), golongan: 'II', vehicle_type: 'Mobil', loaded_tariff: 45000, empty_tariff: 20000 },
@@ -528,11 +517,11 @@ function seedData() {
     insertTariff.run(t.id, t.golongan, t.vehicle_type, t.loaded_tariff, t.empty_tariff);
   }
 
-  console.log('Database seeded: 3 wilayah, dermaga, rute, petugas, dan tarif');
+  console.log('Database seeded: tarif default');
 }
 
-const fresh = !fs.existsSync(DB_PATH);
 if (fresh) initialize();
 migrate();
+seedData();
 
 module.exports = { db };

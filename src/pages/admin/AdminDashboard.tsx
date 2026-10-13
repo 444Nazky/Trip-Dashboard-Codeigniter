@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import { Truck, LayoutGrid, Table2, Hash, Users, BarChart2, Settings, LogOut, Check, X, MapPin } from 'lucide-react'
-import { useApp } from '../store'
 import { fetchTariffs, fetchRegionTariffs } from '../../services/tariffs'
 import { fetchRegions, type Region } from '../../services/regions'
 import { fetchPlates } from '../../services/plates'
@@ -9,12 +8,12 @@ import { ensureAdminSession } from '../../services/auth'
 import { api } from '../../services/api'
 import type { AdminTab } from './components/types'
 import type { BackendOfficerRow } from './components/types'
+import type { TariffRow } from './components/types'
 import type { BackendTrip } from '../../services/trips'
 import type { PlateRecord } from '../../services/plates'
 import type { Officer } from './components/types'
-import { CurrencyProvider } from './components/CurrencyDisplay'
-import { getApiBaseUrl } from '../../services/api'
 import { loadTheme, applyTheme } from '../../services/theme'
+import { environment } from '../../environments/environment'
 import LoginPage from '../LoginPage'
 import ReportSheet from './ReportSheet'
 
@@ -28,7 +27,9 @@ import { ReportsTab } from './tabs/ReportsTab'
 import { SettingsTab } from './tabs/SettingsTab'
 
 export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
-  const { tariffs, saveTariffs, officers, saveOfficers } = useApp()
+  const [tariffs, setTariffs] = useState<TariffRow[]>([])
+  const [officers, setOfficers] = useState<Officer[]>([])
+  const [revealed, setRevealed] = useState(false)
   const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null)
   const [tab, setTab] = useState<AdminTab>('overview')
   const [serverState, setServerState] = useState<'connecting' | 'online' | 'offline'>('connecting')
@@ -89,12 +90,12 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
 
       const [tarr, regn, tri] = await Promise.all([fetchTariffs(), fetchRegions(), fetchTrips()])
       if (!alive) return
-      if (tarr !== null && tarr.length > 0) saveTariffs(tarr)
+      if (tarr !== null && tarr.length > 0) setTariffs(tarr)
       if (regn) setRegions(regn)
       if (tri !== null) setServerTrips(tri)
 
       const offs = await api.getOk<BackendOfficerRow[]>('/officers')
-      if (alive && offs) saveOfficers(mergeBackendOfficers(offs, officers))
+      if (alive && offs) setOfficers(mergeBackendOfficers(offs, officers))
 
       setServerState('online')
     })()
@@ -138,15 +139,11 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
 
   // Kredensial ditolak (password diganti) → form login seragam, tanpa form terpisah
   if (authDenied) return (
-    <LoginPage
-      
-      onLogin={() => { setAuthDenied(false); setAuthRetry(k => k + 1) }}
-    />
+    <LoginPage onLogin={() => { setAuthDenied(false); setAuthRetry(k => k + 1) }} />
   )
 
   return sheetMode ? <ReportSheet /> : (
-    <CurrencyProvider>
-      <div className="flex bg-slate-900 min-h-screen">
+    <div className="flex bg-slate-900 min-h-screen">
         <div className="w-64 bg-[#0F172A] min-h-screen flex flex-col shrink-0 fixed left-0 top-0">
   <div className="p-6 border-b border-slate-800">
     <div className="flex items-center gap-4">
@@ -192,6 +189,8 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
               activeOfficerCount={activeOfficerCount}
               officers={officers}
               serverState={serverState}
+              revealed={revealed}
+              onToggleReveal={() => setRevealed(r => !r)}
               onRefresh={() => void loadOverview()}
               onOpenReports={() => setTab('reports')}
             />
@@ -201,7 +200,7 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
             <TariffTab
               tariffs={tariffs}
               serverState={serverState}
-              onSaveTariffs={saveTariffs}
+              onSaveTariffs={setTariffs}
               showToast={showToast}
             />
           )}
@@ -223,7 +222,7 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
             <OfficersTab
               officers={officers}
               serverState={serverState}
-              onSaveOfficers={saveOfficers}
+              onSaveOfficers={setOfficers}
               showToast={showToast}
             />
           )}
@@ -234,7 +233,9 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
               serverTrips={serverTrips}
               onServerTripsChange={setServerTrips}
               showToast={showToast}
-              baseUrl={getApiBaseUrl()}
+              revealed={revealed}
+              onToggleReveal={() => setRevealed(r => !r)}
+              baseUrl={environment.apiBaseUrl}
             />
           )}
 
@@ -250,6 +251,5 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
         </div>
       </div>
     </div>
-  </CurrencyProvider>
   )
 }

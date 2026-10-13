@@ -1,7 +1,6 @@
-// This file can be replaced during build by using the `fileReplacements` array.
-// `ng build` replaces `environment.ts` with `environment.prod.ts`.
-
 export const environment = {
-  production: false,
-  apiBaseUrl: 'http://localhost:3000/api',
-};
+  production: import.meta.env.PROD,
+  apiBaseUrl: import.meta.env.PROD
+    ? 'https://aplikasi-trip-api-production.up.railway.app/api'
+    : 'http://localhost:3000/api',
+}

@@ -11,7 +11,7 @@ import {
   type ReportFilterOptions,
 } from '../../services/trips'
 import { downloadXlsx } from '../../services/xlsx'
-import { getApiBaseUrl } from '../../services/api'
+import { environment } from '../../environments/environment'
 import { resolvePhotoUrl } from './components/PhotoViewer'
 
 const fmtRp = (n: number) => `Rp ${Number(n || 0).toLocaleString('id-ID')}`
@@ -22,7 +22,7 @@ const fmtRp = (n: number) => `Rp ${Number(n || 0).toLocaleString('id-ID')}`
 // sebelumnya membuat dashboard blank saat runtime.
 const fotoUrl = (path: string | null | undefined) => {
   if (!path) return null
-  return resolvePhotoUrl(path, getApiBaseUrl())
+  return resolvePhotoUrl(path, environment.apiBaseUrl)
 }
 
 const fmtCoords = (lat?: number | null, lng?: number | null) => {

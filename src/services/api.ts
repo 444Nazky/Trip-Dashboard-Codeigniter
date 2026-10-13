@@ -15,11 +15,6 @@ interface ApiResponse<T> {
   ok: boolean
 }
 
-/** Base URL API — sama untuk semua platform. */
-export function getApiBaseUrl(): string {
-  return environment.apiBaseUrl
-}
-
 class ApiService {
   private _token: string | null = null
 
