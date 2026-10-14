@@ -11,6 +11,8 @@ const dermagaRoutes = require('./routes/dermagas');
 const routeRoutes = require('./routes/routes');
 const reportRoutes = require('./routes/reports');
 const geofenceRoutes = require('./routes/geofences');
+const appVersionRoutes = require('./routes/appVersion');
+const appDownloadRoutes = require('./routes/appDownload');
 const { UPLOADS_DIR } = require('./uploads-dir');
 const { db } = require('./db');
 
@@ -40,6 +42,8 @@ app.use('/api/dermagas', dermagaRoutes);
 app.use('/api/routes', routeRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/geofences', geofenceRoutes);
+app.use('/api/v1', appVersionRoutes);
+app.use('/api/v1', appDownloadRoutes);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });

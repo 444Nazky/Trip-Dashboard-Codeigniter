@@ -72,3 +72,51 @@ Kode rute untuk geofence berformat `ASAL-TUJUAN` (cth. `SJRE-SBDZ`).
 Push ke `main` → GitHub Actions menjalankan `npm ci && npm run build` lalu deploy `www/` ke Firebase Hosting (project `aplikasi-trip`). Konfigurasi hosting ada di `firebase.json`.
 
 URL API produksi di-set di `src/environments/environment.ts` (cabang `import.meta.env.PROD`).
+
+## 🔄 Custom Self-Hosted API Update System
+
+> **Status:** PRODUKSI — Mengganti sistem OTA pihak ketiga yang sering mengalami kegagalan patch/update sekunder.
+> **Tanggal Overhaul:** 2026-10-14
+
+### API Endpoints
+
+| Endpoint | Method | Deskripsi |
+|----------|--------|-----------|
+| `/api/v1/app-version` | GET | Cek versi terbaru aplikasi mobile |
+| `/api/v1/app-download/:version` | GET | Download file APK |
+| `/api/v1/apk-list` | GET | List semua versi APK |
+| `/api/v1/apk-info/:version` | GET | Info APK (size, hash) |
+| `/api/v1/release-notes/:version` | GET | Catatan rilis |
+| `/api/v1/publish-version` | POST | Publish APK baru (admin) |
+
+### Publish APK Baru
+
+```bash
+# Install di root project
+node scripts/publish-apk.mjs \
+  --apk=/path/to/app-release.apk \
+  --version=1.0.1 \
+  --notes="Perbaikan bug"
+
+# Dengan force update
+node scripts/publish-apk.mjs \
+  --apk=/path/to/app.apk \
+  --version=2.0.0 \
+  --force-update \
+  --min-version=1.0.0
+```
+
+### Penyimpanan
+
+```
+backend/
+├── apks/               # File APK
+│   ├── app-1.0.0.apk
+│   └── app-1.0.1.apk
+└── metadata/
+    └── versions.json   # Metadata versi
+```
+
+### Dokumentasi Lengkap
+
+Lihat `UPDATE-SYSTEM-ARCHITECTURE.md` untuk detail arsitektur lengkap.
