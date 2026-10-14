@@ -1,14 +1,13 @@
 /**
  * Gerbang login admin di dashboard (build admin).
  *
- * Muncul HANYA ketika backend menolak kredensial tersimpan (mis. password
- * diganti lewat mesin lain / localStorage dibersihkan). Form sederhana ini
- * menyimpan kredensial baru lalu memberi tahu parent (AdminDashboard) untuk
- * mencoba sesi ulang — tanpa membawa form login petugas/mobile ke sini.
+ * Muncul HANYA ketika backend menolak sesi (token kedaluwarsa / password
+ * diganti). Form menyimpan token sesi (api.ts) — TANPA menyimpan password
+ * di browser dan tanpa tombol kredensial bawaan.
  */
 import { useState } from 'react'
 import { Lock, Loader2 } from 'lucide-react'
-import { saveAdminCredentials, AUTH_EVENT } from '../services/auth'
+import { adminLogin, AUTH_EVENT } from '../services/auth'
 
 interface Props {
   onLogin?: () => void
@@ -28,12 +27,15 @@ export default function LoginPage({ onLogin }: Props) {
     }
     setBusy(true)
     setErr(null)
-    // Simpan kredensial baru → AdminDashboard langsung fetch data
-    saveAdminCredentials(username.trim(), password)
-    // Sinkronisasi App.tsx Shell (penting saat parent & child hidup di luar render cycle).
+    const session = await adminLogin(username.trim(), password)
+    setBusy(false)
+    if (!session.ok) {
+      setErr(session.authDenied ? 'Username atau password salah.' : 'Server tidak merespon.')
+      return
+    }
+    // Sinkronisasi App.tsx Shell — Shell re-validasi token via ensureAdminSession.
     window.dispatchEvent(new CustomEvent(AUTH_EVENT))
-    // Beri tahu parent; Shell validasi backend bukan parent ini. Sinkronisasi App.tsx duluan.
-    setTimeout(() => { setBusy(false); onLogin?.() }, 150)
+    setTimeout(() => onLogin?.(), 150)
   }
 
   return (
@@ -83,15 +85,7 @@ export default function LoginPage({ onLogin }: Props) {
           className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-bold py-3 rounded-xl text-sm transition-colors flex items-center justify-center gap-2"
         >
           {busy && <Loader2 size={15} className="animate-spin" />}
-          Coba Lagi
-        </button>
-
-        <button
-          type="button"
-          onClick={() => { saveAdminCredentials('admin', 'admin123'); onLogin?.() }}
-          className="w-full text-[11px] text-slate-400 hover:text-slate-600 py-1"
-        >
-          Gunakan kredensial bawaan (admin / admin123)
+          Masuk
         </button>
       </form>
     </div>

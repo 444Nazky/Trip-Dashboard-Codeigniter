@@ -3,6 +3,8 @@
 
 <head>
   <meta charset="utf-8" />
+  <!-- CSP: batasi sumber daya yang boleh dimuat — membatasi dampak XSS. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://*.up.railway.app; connect-src 'self' https://*.up.railway.app http://localhost:3000 ws://localhost:3000 wss://localhost:3000; font-src 'self' data:; object-src 'none'; base-uri 'self'; form-action 'self'" />
   <title>Admin Trip Angkutan</title>
   <style>
     body {

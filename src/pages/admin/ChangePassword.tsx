@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { Lock, Check, X } from 'lucide-react'
 import { api } from '../../services/api'
-import { saveAdminCredentials } from '../../services/auth'
 
 interface ChangePasswordProps {
   onLogout?: () => void
@@ -33,7 +32,7 @@ export function ChangePasswordSection({ onLogout, showToast }: ChangePasswordPro
         setErr(result.error?.message || 'Gagal menyimpan password.')
         return
       }
-      saveAdminCredentials(result.data?.username ?? 'admin', next)
+      // Token sesi tetap berlaku; password TIDAK disimpan di browser.
       setDone(true)
       showToast?.('Password admin diganti.', 'success')
       setCur(''); setNext(''); setConfirm('')
@@ -41,7 +40,7 @@ export function ChangePasswordSection({ onLogout, showToast }: ChangePasswordPro
   }
 
   const mismatch = confirm.length > 0 && next !== confirm
-  const ready = cur.length > 0 && next.length >= 6 && confirm.length > 0 && next === confirm
+  const ready = cur.length > 0 && next.length >= 8 && confirm.length > 0 && next === confirm
 
   if (done) return (
     <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-center gap-3">
@@ -79,7 +78,7 @@ export function ChangePasswordSection({ onLogout, showToast }: ChangePasswordPro
         </div>
         <div>
           <label className="text-[11px] font-semibold block mb-1.5">
-            Baru <span className="normal-case font-normal text-slate-400">(min. 6 karakter)</span>
+            Baru <span className="normal-case font-normal text-slate-400">(min. 8 karakter)</span>
           </label>
           <input
             type="password" value={next} autoComplete="new-password"

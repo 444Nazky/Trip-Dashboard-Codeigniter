@@ -1,6 +1,11 @@
 /**
  * Admin Auth Service — admin-only. Tidak mengimpor pages/ atau komponen mobile.
  *
+ * Keamanan: sesi = token JWT saja (api.ts sudah persist ke localStorage).
+ * Password TIDAK pernah disimpan di browser (localStorage terbaca oleh XSS
+ * / siapa pun yang mengakses mesin) dan TIDAK ada fallback kredensial bawaan
+ * 'admin/admin123' (backdoor takeover).
+ *
  * AUTH_EVENT dipakai juga oleh App.tsx, LoginPage.tsx.
  */
 
@@ -8,42 +13,24 @@ import { api } from './api'
 
 export const AUTH_EVENT = 'admin-login'
 
-/** Kunci sesi token (baca/tulis dari Shell). */
+/** Kunci sesi lama — hanya untuk dibersihkan setelah migrasi ke token-only. */
 export const ADMIN_KEY = 'trip.auth.admin.v1'
-/** Kunci kredensial (tulis dari LoginPage, baca dari LoginPage). */
+/** Kunci kredensial lama (plaintext) — dihapus pada load untuk memigrasi. */
 export const ADMIN_CREDS_KEY = 'trip.admin.creds.v1'
-
-export interface AdminCreds {
-  username: string
-  password: string
-}
 
 export interface AdminSessionResult {
   ok: boolean
-  /** True bila server menolak kredensial lama. */
+  /** True bila server menolak token/kredensial (perlu form login). */
   authDenied: boolean
 }
 
-export function getAdminCredentials(): AdminCreds | null {
-  try {
-    const raw = localStorage.getItem(ADMIN_CREDS_KEY)
-    if (!raw) return null
-    const c = JSON.parse(raw) as AdminCreds
-    return c.username && c.password ? c : null
-  } catch { return null }
-}
+// Migrasi sekali: hapus kredensial plaintext lama dari localStorage.
+try {
+  localStorage.removeItem(ADMIN_CREDS_KEY)
+  localStorage.removeItem(ADMIN_KEY)
+} catch { /* quota */ }
 
-/** Hapus kredensial tersimpan — dipakai ChangePassword.tsx. */
-export function clearAdminCredentials() {
-  try { localStorage.removeItem(ADMIN_CREDS_KEY) } catch { /* quota */ }
-}
-
-/** Simpan kredensial admin setelah login, dipakai LoginPage.tsx. */
-export function saveAdminCredentials(username: string, password: string) {
-  try { localStorage.setItem(ADMIN_CREDS_KEY, JSON.stringify({ username, password })) } catch { /* quota */ }
-}
-
-/** Akhiri sesi & bersihkan semua data auth (logout tombol). */
+/** Akhiri sesi & bersihkan data auth (logout tombol). */
 export function logout() {
   try {
     localStorage.removeItem(ADMIN_KEY)
@@ -52,31 +39,35 @@ export function logout() {
   api.setToken(null)
 }
 
-/** Kirim kredensial ke backend & simpan token sesi. */
+/**
+ * Validasi sesi dari token tersimpan.
+ * - Token ada & diterima server → ok.
+ * - Token ditolak (401) → authDenied (tampilkan login).
+ * - Server tidak terjangkau → offline (bukan authDenied).
+ */
 export async function ensureAdminSession(): Promise<AdminSessionResult> {
-  const attempts: AdminCreds[] = []
-  const stored = getAdminCredentials()
-  if (stored) attempts.push(stored)
+  if (!api.token) return { ok: false, authDenied: true }
 
-  const fallback: AdminCreds = { username: 'admin', password: 'admin123' }
-  if (!attempts.some(c => c.username === fallback.username && c.password === fallback.password)) {
-    attempts.push(fallback)
+  // Endpoint admin murah untuk membuktikan token masih berlaku.
+  const probe = await api.get('/tariffs')
+  if (probe.ok) return { ok: true, authDenied: false }
+  if (probe.error?.code === '401') {
+    api.setToken(null)
+    return { ok: false, authDenied: true }
   }
+  // Network / 5xx → jangan tampilkan login (dashboard tetap bisa offline).
+  return { ok: false, authDenied: false }
+}
 
-  for (const creds of attempts) {
-    const result = await api.post<{ token: string }>('/auth/admin-login', creds)
-    if (result.ok && result.data) {
-      api.setToken(result.data.token)
-      try {
-        localStorage.setItem(ADMIN_KEY, JSON.stringify({ token: result.data.token, username: creds.username }))
-        if (creds.username !== fallback.username || creds.password !== fallback.password) {
-          // Simpan kredensial non-bawaan agar retry tanpa ketik ulang.
-          saveAdminCredentials(creds.username, creds.password)
-        }
-      } catch { /* quota */ }
-      return { ok: true, authDenied: false }
-    }
-    if (result.error?.code === '401') { /* tolak kredensial */ }
+/** Login admin: kirim kredensial, simpan token sesi. */
+export async function adminLogin(username: string, password: string): Promise<AdminSessionResult> {
+  const result = await api.post<{ token: string }>('/auth/admin-login', { username, password })
+  if (result.ok && result.data?.token) {
+    api.setToken(result.data.token)
+    return { ok: true, authDenied: false }
   }
-  return { ok: false, authDenied: true }
+  if (result.error?.code === '401' || result.error?.code === '503') {
+    return { ok: false, authDenied: true }
+  }
+  return { ok: false, authDenied: false }
 }
