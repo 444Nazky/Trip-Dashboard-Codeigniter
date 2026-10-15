@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { Check } from 'lucide-react'
 import { environment } from '../../../environments/environment'
 import { ChangePasswordSection } from '../ChangePassword'
-import { normalizeBaseUrl, pingBaseUrl, resolveApiBaseUrl, setApiBaseUrlOverride } from '../../../services/api'
+import { apiBaseCandidateLabel, apiBaseCandidates, autoDetectApiBaseUrl, normalizeBaseUrl, pingBaseUrl, resolveApiBaseUrl, setApiBaseUrlOverride } from '../../../services/api'
 
 
 
@@ -138,7 +138,29 @@ export function SettingsTab({ onLogout, serverState, tariffs, officers, showToas
               spellCheck={false}
               className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs text-slate-800 focus:outline-none focus:border-blue-500"
             />
-            <p className="text-[11px] text-slate-400 break-all">Aktif: {resolveApiBaseUrl()}<br />Default: {environment.apiBaseUrl}</p>
+            <p className="text-[11px] text-slate-400 break-all">
+              Aktif: {resolveApiBaseUrl()}
+              {apiBaseCandidateLabel(resolveApiBaseUrl()) ? ` (${apiBaseCandidateLabel(resolveApiBaseUrl())})` : ''}
+              <br />Default: {environment.apiBaseUrl}
+            </p>
+
+            <div className="flex flex-wrap gap-1.5">
+              {apiBaseCandidates().map(c => (
+                <button
+                  key={c.url}
+                  type="button"
+                  onClick={() => setServerUrl(c.url)}
+                  title={c.url}
+                  className={`px-2 py-1 rounded-lg text-[10px] font-bold border transition-colors ${
+                    normalizeBaseUrl(serverUrl) === c.url
+                      ? 'border-blue-600 bg-blue-600 text-white'
+                      : 'border-slate-200 text-slate-600 hover:bg-white'
+                  }`}
+                >
+                  {c.label}
+                </button>
+              ))}
+            </div>
 
             <div className="flex flex-wrap gap-2">
               <button
@@ -152,10 +174,19 @@ export function SettingsTab({ onLogout, serverState, tariffs, officers, showToas
                   setTesting(true)
                   const r = await pingBaseUrl(v)
                   setTesting(false)
-                  if (!r.ok) { showToast(`Server tidak merespon (${r.ms} ms)`, 'error'); return }
+                  // URL yang bisa dijangkau tetap disimpan walau browser memblokir
+                  // bacaannya (origin dashboard belum terdaftar di CORS_ORIGIN server).
+                  if (!r.ok) {
+                    showToast(r.timedOut
+                      ? `Server tidak merespon (timeout ${r.ms} ms) — URL lama tetap dipakai`
+                      : `Server tidak merespon (${r.ms} ms) — URL lama tetap dipakai`, 'error')
+                    return
+                  }
                   setApiBaseUrlOverride(v)
                   setServerUrl(normalizeBaseUrl(v))
-                  showToast(`Tersambung (${r.ms} ms), URL diterapkan`, 'success')
+                  showToast(r.blockedByCors
+                    ? `Server hidup (${r.ms} ms) tapi browser memblokir CORS. URL disimpan — minta admin server menambahkan origin ini ke CORS_ORIGIN`
+                    : `Tersambung (${r.ms} ms), URL diterapkan`, r.blockedByCors ? 'error' : 'success')
                 }}
                 className="px-3 py-1.5 rounded-lg bg-blue-600 text-white font-semibold text-xs hover:bg-blue-700 disabled:opacity-50"
               >
@@ -169,7 +200,9 @@ export function SettingsTab({ onLogout, serverState, tariffs, officers, showToas
                   setTesting(true)
                   const r = await pingBaseUrl(resolveApiBaseUrl())
                   setTesting(false)
-                  showToast(r.ok ? `Kembali default (${r.ms} ms)` : 'Default tidak merespon', r.ok ? 'success' : 'error')
+                  showToast(r.ok
+                    ? `Kembali default (${r.ms} ms)${r.blockedByCors ? ' — browser memblokir CORS' : ''}`
+                    : `Default tidak merespon (${r.ms} ms)`, r.ok ? 'success' : 'error')
                 }}
                 className="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-700 font-bold text-xs hover:bg-slate-50 disabled:opacity-50"
               >
@@ -181,11 +214,47 @@ export function SettingsTab({ onLogout, serverState, tariffs, officers, showToas
                   setTesting(true)
                   const r = await pingBaseUrl(serverUrl)
                   setTesting(false)
-                  showToast(r.ok ? `Backend aktif (${r.ms} ms)` : `Gagal (${r.ms} ms)`, r.ok ? 'success' : 'error')
+                  showToast(
+                    r.ok
+                      ? `Backend aktif (${r.ms} ms)${typeof r.status === 'number' ? ` — HTTP ${r.status}` : ''}`
+                      : `Gagal (${r.ms} ms)`,
+                    r.ok ? 'success' : 'error',
+                  )
                 }}
                 className="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-700 font-semibold text-xs hover:bg-slate-50 disabled:opacity-50"
               >
                 Tes Koneksi
+              </button>
+              <button
+                disabled={testing}
+                onClick={async () => {
+                  setTesting(true)
+                  const found = await autoDetectApiBaseUrl()
+                  setTesting(false)
+                  if (!found) {
+                    showToast('Tidak ada endpoint kandidat yang menjawab — isi URL manual', 'error')
+                    return
+                  }
+                  setServerUrl(found)
+                  showToast(`Endpoint terjangkau: ${apiBaseCandidateLabel(found) ?? found}`, 'success')
+                }}
+                className="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-700 font-semibold text-xs hover:bg-slate-50 disabled:opacity-50"
+              >
+                Deteksi Otomatis
+              </button>
+              <button
+                disabled={testing}
+                onClick={() => {
+                  const v = serverUrl.trim()
+                  if (!v) { showToast('URL kosong', 'error'); return }
+                  setApiBaseUrlOverride(v)
+                  const applied = resolveApiBaseUrl()
+                  setServerUrl(applied)
+                  showToast(`URL disimpan tanpa tes: ${applied}`, 'success')
+                }}
+                className="px-3 py-1.5 rounded-lg border border-amber-300 bg-amber-50 text-amber-800 font-bold text-xs hover:bg-amber-100 disabled:opacity-50"
+              >
+                Simpan tanpa tes
               </button>
             </div>
           </div>

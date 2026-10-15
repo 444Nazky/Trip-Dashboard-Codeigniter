@@ -27,6 +27,8 @@ export function resolveApiBaseUrl(): string {
   try {
     const override = localStorage.getItem(API_BASE_URL_OVERRIDE_KEY)
     if (override && override.trim()) return normalizeBaseUrl(override)
+    const auto = readAutoDetectedBaseUrl()
+    if (auto) return auto
   } catch {}
   return normalizeBaseUrl(environment.apiBaseUrl)
 }
@@ -34,11 +36,23 @@ export function resolveApiBaseUrl(): string {
 
 
 
+// host lokal/LAN boleh tanpa TLS; host publik wajib https.
+const LOCAL_HOST = /^(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\]|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/i
+
+
+
 // rapikan format url
 export function normalizeBaseUrl(raw: string): string {
   let url = String(raw ?? '').trim().replace(/\/+$/, '')
   if (!url) return url
-  if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(url)) url = `http://${url}`
+  if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(url)) {
+    // Dulu selalu `http://` — akibatnya hostname publik yang diketik tanpa skema
+    // (mis. tunnel xxx.trycloudflare.com) jadi http di halaman https milik dashboard
+    // dan langsung ditolak browser (mixed content) → "Server tidak merespon".
+    // Sekarang host lokal/LAN tetap http, sisanya https.
+    const host = url.split('/')[0]
+    url = `${LOCAL_HOST.test(host) ? 'http' : 'https'}://${url}`
+  }
   if (!/\/api$/i.test(url)) url = `${url}/api`
   return url
 }
@@ -57,21 +71,143 @@ export function setApiBaseUrlOverride(url: string | null): void {
 
 
 
-// tes koneksi ke url
-export async function pingBaseUrl(raw: string, timeoutMs = 10000): Promise<{ ok: boolean; ms: number }> {
+// hasil cek kesehatan server (dipakai form Server/Endpoint di Pengaturan)
+export interface ServerProbe {
+  /** server menjawab (walau balasannya tidak bisa dibaca karena CORS / berstatus error) */
+  ok: boolean
+  ms: number
+  /** server hidup tapi browser memblokir bacaannya (origin belum ada di CORS_ORIGIN) */
+  blockedByCors: boolean
+  /** berhenti karena timeout, bukan karena koneksi ditolak */
+  timedOut: boolean
+  status?: number
+}
+
+
+
+
+// Kandidat endpoint bawaan: build produksi hanya mengenal Railway, sehingga
+// saat dashboard diarahkan ke server uji (laptop/tunnel/LAN) admin harus mengetik
+// URL panjang dan mudah salah. Daftar ini jadi tombol pilih-cepat + auto-deteksi.
+export interface ApiBaseCandidate {
+  label: string
+  url: string
+}
+
+const API_BASE_AUTODETECT_KEY = 'trip.admin.api.autoBaseUrl'
+const AUTODETECT_TTL_MS = 10 * 60 * 1000
+
+
+
+
+export function apiBaseCandidates(): ApiBaseCandidate[] {
+  const urls: ApiBaseCandidate[] = [
+    { label: 'Default build', url: normalizeBaseUrl(environment.apiBaseUrl) },
+    { label: 'Produksi (Railway)', url: 'https://aplikasi-trip-api-production.up.railway.app/api' },
+    { label: 'Backend lokal laptop', url: 'http://localhost:3000/api' },
+    { label: 'Backend lokal (LAN)', url: 'http://192.168.1.5:3000/api' },
+  ]
+  const seen = new Set<string>()
+  return urls.filter(c => {
+    if (!c.url || seen.has(c.url)) return false
+    seen.add(c.url)
+    return true
+  })
+}
+
+
+
+
+export function apiBaseCandidateLabel(url: string): string | null {
+  const target = normalizeBaseUrl(url)
+  return apiBaseCandidates().find(c => c.url === target)?.label ?? null
+}
+
+
+
+
+function readAutoDetectedBaseUrl(): string | null {
+  try {
+    const raw = localStorage.getItem(API_BASE_AUTODETECT_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as { url?: string; at?: number }
+    if (!parsed?.url) return null
+    if (Date.now() - Number(parsed.at ?? 0) > AUTODETECT_TTL_MS) return null
+    return normalizeBaseUrl(parsed.url)
+  } catch {
+    return null
+  }
+}
+
+
+
+
+/** Pilih endpoint pertama yang menjawab dari daftar kandidat (URL manual menang). */
+export async function autoDetectApiBaseUrl(timeoutMs = 3500): Promise<string | null> {
+  let hasOverride = false
+  try {
+    const override = localStorage.getItem(API_BASE_URL_OVERRIDE_KEY)
+    hasOverride = !!override && !!override.trim()
+  } catch { /* storage mati */ }
+  if (hasOverride) return resolveApiBaseUrl()
+
+  for (const candidate of apiBaseCandidates()) {
+    const probe = await pingBaseUrl(candidate.url, timeoutMs)
+    if (!probe.ok) continue
+    try {
+      localStorage.setItem(API_BASE_AUTODETECT_KEY, JSON.stringify({ url: candidate.url, at: Date.now() }))
+    } catch { /* storage penuh */ }
+    console.log(`[admin-api] Endpoint auto-detect: ${candidate.label} → ${candidate.url}`)
+    return candidate.url
+  }
+  return null
+}
+
+
+
+// tes koneksi ke url.
+// fetch biasa MENOLAK (throw) bila respons lintas-origin tidak membawa header
+// Access-Control-Allow-Origin — padahal server menjawab 200. Dulu itu dilaporkan
+// "Server tidak merespon" sehingga URL yang benar ikut dibuang. Di sini kegagalan
+// dibedakan: benar-benar mati / timeout / hidup tapi diblokir CORS.
+export async function pingBaseUrl(raw: string, timeoutMs = 10000): Promise<ServerProbe> {
   const base = normalizeBaseUrl(raw)
   const t0 = Date.now()
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  const hit = (mode?: RequestMode) =>
+    fetch(`${base}/health?_t=${Date.now()}`, {
+      cache: 'no-store',
+      signal: controller.signal,
+      ...(mode ? { mode } : {}),
+    })
+
   try {
-    const c = new AbortController()
-    const t = setTimeout(() => c.abort(), timeoutMs)
     try {
-      const r = await fetch(`${base}/health?_t=${Date.now()}`, { cache: 'no-store', signal: c.signal })
-      return { ok: r.ok, ms: Date.now() - t0 }
-    } finally {
-      clearTimeout(t)
+      const r = await hit()
+      // Respons HTTP apa pun (200/401/404) = host HIDUP. Dulu hanya `r.ok` yang
+      // dianggap hidup sehingga server yang menjawab 401/404 dilaporkan "tidak
+      // merespon" dan URL yang benar tidak pernah tersimpan.
+      return { ok: true, status: r.status, ms: Date.now() - t0, blockedByCors: false, timedOut: false }
+    } catch (err) {
+      if (controller.signal.aborted) {
+        return { ok: false, ms: Date.now() - t0, blockedByCors: false, timedOut: true }
+      }
+      // Request mode 'no-cors' tidak butuh header CORS: kalau ini berhasil berarti
+      // server hidup dan hanya diblokir browser (origin belum diizinkan server).
+      try {
+        const r = await hit('no-cors')
+        if (r.type === 'opaque' || r.status === 0) {
+          return { ok: true, ms: Date.now() - t0, blockedByCors: true, timedOut: false }
+        }
+        return { ok: true, status: r.status, ms: Date.now() - t0, blockedByCors: false, timedOut: false }
+      } catch {
+        void err
+        return { ok: false, ms: Date.now() - t0, blockedByCors: false, timedOut: false }
+      }
     }
-  } catch {
-    return { ok: false, ms: Date.now() - t0 }
+  } finally {
+    clearTimeout(timer)
   }
 }
 
