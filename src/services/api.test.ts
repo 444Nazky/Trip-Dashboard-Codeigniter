@@ -10,7 +10,7 @@
  *      pernah tersimpan. Sekarang server-yang-hidup-tapi-CORS dibedakan.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { autoDetectApiBaseUrl, normalizeBaseUrl, pingBaseUrl, resolveApiBaseUrl, setApiBaseUrlOverride } from './api'
+import { autoDetectApiBaseUrl, isMixedContentRisk, normalizeBaseUrl, pingBaseUrl, resolveApiBaseUrl, setApiBaseUrlOverride } from './api'
 
 
 
@@ -52,6 +52,36 @@ describe('normalizeBaseUrl (Pengaturan Server)', () => {
 
   it('akhiran /api ditambahkan sekali saja', () => {
     expect(normalizeBaseUrl('https://abc.trycloudflare.com/api/')).toBe('https://abc.trycloudflare.com/api')
+  })
+})
+
+
+
+describe('mixed content (halaman https → server http://)', () => {
+  it('server LAN http dari dashboard https terdeteksi sebagai mixed content', () => {
+    expect(isMixedContentRisk('192.168.1.5:3000', 'https://aplikasi-trip.web.app/')).toBe(true)
+    expect(isMixedContentRisk('http://192.168.1.5:3000/api', 'https://aplikasi-trip.web.app/')).toBe(true)
+  })
+
+  it('https target / dashboard lokal http tidak dianggap mixed content', () => {
+    expect(isMixedContentRisk('https://abc.trycloudflare.com', 'https://aplikasi-trip.web.app/')).toBe(false)
+    expect(isMixedContentRisk('192.168.1.5:3000', 'http://localhost:5173/')).toBe(false)
+  })
+
+  it('pingBaseUrl melaporkan mixedContent (bukan "tidak merespon") tanpa menembak jaringan', async () => {
+    let called = 0
+    globalThis.fetch = vi.fn(async () => { called++; return { ok: true, status: 200, type: 'cors' } as unknown as Response }) as unknown as typeof fetch
+    ;(globalThis as { location?: unknown }).location = { href: 'https://aplikasi-trip.web.app/' }
+    try {
+      const r = await pingBaseUrl('192.168.1.5:3000')
+      expect(r.ok).toBe(false)
+      expect(r.mixedContent).toBe(true)
+      expect(r.timedOut).toBe(false)
+      expect(r.detail).toMatch(/mixed content|https/i)
+      expect(called).toBe(0)
+    } finally {
+      delete (globalThis as { location?: unknown }).location
+    }
   })
 })
 

@@ -177,9 +177,11 @@ export function SettingsTab({ onLogout, serverState, tariffs, officers, showToas
                   // URL yang bisa dijangkau tetap disimpan walau browser memblokir
                   // bacaannya (origin dashboard belum terdaftar di CORS_ORIGIN server).
                   if (!r.ok) {
-                    showToast(r.timedOut
-                      ? `Server tidak merespon (timeout ${r.ms} ms) — URL lama tetap dipakai`
-                      : `Server tidak merespon (${r.ms} ms) — URL lama tetap dipakai`, 'error')
+                    showToast(r.mixedContent
+                      ? (r.detail ?? 'Browser memblokir http:// dari halaman https (mixed content) — URL lama tetap dipakai')
+                      : r.timedOut
+                        ? `Server tidak merespon (timeout ${r.ms} ms) — URL lama tetap dipakai`
+                        : `Server tidak merespon (${r.ms} ms) — URL lama tetap dipakai`, 'error')
                     return
                   }
                   setApiBaseUrlOverride(v)
@@ -217,7 +219,9 @@ export function SettingsTab({ onLogout, serverState, tariffs, officers, showToas
                   showToast(
                     r.ok
                       ? `Backend aktif (${r.ms} ms)${typeof r.status === 'number' ? ` — HTTP ${r.status}` : ''}`
-                      : `Gagal (${r.ms} ms)`,
+                      : r.mixedContent
+                        ? (r.detail ?? 'http:// diblokir dari halaman https (mixed content)')
+                        : `Gagal (${r.ms} ms)`,
                     r.ok ? 'success' : 'error',
                   )
                 }}

@@ -81,6 +81,39 @@ export interface ServerProbe {
   /** berhenti karena timeout, bukan karena koneksi ditolak */
   timedOut: boolean
   status?: number
+  /**
+   * Halaman dashboard dibuka via https sedangkan URL server http:// → browser
+   * MEMBLOKIR sebelum request dikirim (mixed content). Server bisa saja sehat;
+   * yang salah adalah kombinasi skema. Dulu ini berbunyi "Server tidak merespon".
+   */
+  mixedContent?: boolean
+  /** pesan siap-tampil untuk kasus yang tak bisa diperbaiki dari sisi dashboard */
+  detail?: string
+}
+
+
+
+
+/** Halaman ini dibuka via https? */
+export function isPageHttps(pageHref = typeof location === 'undefined' ? '' : location.href): boolean {
+  return /^https:/i.test(String(pageHref ?? ''))
+}
+
+
+
+/**
+ * Apakah request ke URL ini akan diblokir browser karena mixed content?
+ *
+ * Dashboard produksi disajikan lewat https (Firebase/Netlify), sehingga server
+ * http:// — termasuk server LAN kantor 192.168.x — TIDAK BISA dihubungi langsung
+ * dari halaman itu. Deteksi di depan supaya admin dapat penjelasan yang benar
+ * (pakai https/tunnel, atau jalankan dashboard lokal via `npm start`).
+ */
+export function isMixedContentRisk(
+  rawUrl: string,
+  pageHref = typeof location === 'undefined' ? '' : location.href,
+): boolean {
+  return isPageHttps(pageHref) && /^http:\/\//i.test(normalizeBaseUrl(rawUrl))
 }
 
 
@@ -173,6 +206,19 @@ export async function autoDetectApiBaseUrl(timeoutMs = 3500): Promise<string | n
 export async function pingBaseUrl(raw: string, timeoutMs = 10000): Promise<ServerProbe> {
   const base = normalizeBaseUrl(raw)
   const t0 = Date.now()
+
+  // https page → http target: browser menolak duluan. Jelaskan sebabnya, jangan
+  // bilang "server tidak merespon" (server-nya bisa sehat).
+  if (isMixedContentRisk(base)) {
+    return {
+      ok: false,
+      ms: 0,
+      blockedByCors: false,
+      timedOut: false,
+      mixedContent: true,
+      detail: 'Dashboard ini dibuka via https, jadi browser memblokir alamat http:// (mixed content). Pakai https (mis. cloudflared tunnel), atau jalankan dashboard lokal (`npm start`) untuk menuju server LAN.',
+    }
+  }
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeoutMs)
   const hit = (mode?: RequestMode) =>
