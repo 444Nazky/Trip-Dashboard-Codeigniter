@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { Check } from 'lucide-react'
 import { environment } from '../../../environments/environment'
 import { ChangePasswordSection } from '../ChangePassword'
+import { normalizeBaseUrl, pingBaseUrl, resolveApiBaseUrl, setApiBaseUrlOverride } from '../../../services/api'
 
 
 
@@ -20,6 +21,8 @@ interface SettingsTabProps {
 
 export function SettingsTab({ onLogout, serverState, tariffs, officers, showToast }: SettingsTabProps) {
   const [theme, setTheme] = useState<AdminTheme>(() => loadTheme())
+  const [serverUrl, setServerUrl] = useState(() => resolveApiBaseUrl())
+  const [testing, setTesting] = useState(false)
 
   useEffect(() => {
     applyTheme(theme)
@@ -117,7 +120,7 @@ export function SettingsTab({ onLogout, serverState, tariffs, officers, showToas
 
         <div className="grid grid-cols-2 gap-6">
           <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 space-y-3">
-            <p className="text-[12px] font-bold text-slate-700 uppercase tracking-wide">Status API</p>
+            <p className="text-[12px] font-bold text-slate-700 uppercase tracking-wide">Server / Endpoint</p>
             <div className="flex items-center gap-2">
               <span className={`w-2.5 h-2.5 rounded-full ${serverState === 'online' ? 'bg-emerald-500' : serverState === 'offline' ? 'bg-amber-500' : 'bg-slate-400'}`} />
               <span className="text-sm font-semibold text-slate-800">
@@ -125,15 +128,66 @@ export function SettingsTab({ onLogout, serverState, tariffs, officers, showToas
               </span>
             </div>
 
-            <p className="text-[11px] text-slate-400 break-all">{environment.apiBaseUrl}</p>
-            <button
-              onClick={async () => {
-                try { await fetch(environment.apiBaseUrl); showToast('Backend aktif', 'success') } catch { showToast('Gagal', 'error') }
-              }}
-              className="px-3 py-1.5 rounded-lg bg-blue-600 text-white font-semibold text-xs hover:bg-blue-700"
-            >
-              Tes Koneksi
-            </button>
+            <input
+              type="url"
+              value={serverUrl}
+              onChange={e => setServerUrl(e.target.value)}
+              placeholder="https://xxxx.trycloudflare.com"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs text-slate-800 focus:outline-none focus:border-blue-500"
+            />
+            <p className="text-[11px] text-slate-400 break-all">Aktif: {resolveApiBaseUrl()}<br />Default: {environment.apiBaseUrl}</p>
+
+            <div className="flex flex-wrap gap-2">
+              <button
+                disabled={testing}
+                onClick={async () => {
+                  const v = serverUrl.trim()
+                  if (!v) { showToast('URL kosong', 'error'); return }
+                  if (/^http:\/\//i.test(v) && !/localhost|127\.0\.0\.1|192\.168\.|10\./.test(v)) {
+                    showToast('Pakai https, kecuali localhost/LAN', 'error'); return
+                  }
+                  setTesting(true)
+                  const r = await pingBaseUrl(v)
+                  setTesting(false)
+                  if (!r.ok) { showToast(`Server tidak merespon (${r.ms} ms)`, 'error'); return }
+                  setApiBaseUrlOverride(v)
+                  setServerUrl(normalizeBaseUrl(v))
+                  showToast(`Tersambung (${r.ms} ms), URL diterapkan`, 'success')
+                }}
+                className="px-3 py-1.5 rounded-lg bg-blue-600 text-white font-semibold text-xs hover:bg-blue-700 disabled:opacity-50"
+              >
+                {testing ? 'Mengetes…' : 'Simpan & Terapkan'}
+              </button>
+              <button
+                disabled={testing}
+                onClick={async () => {
+                  setApiBaseUrlOverride(null)
+                  setServerUrl(resolveApiBaseUrl())
+                  setTesting(true)
+                  const r = await pingBaseUrl(resolveApiBaseUrl())
+                  setTesting(false)
+                  showToast(r.ok ? `Kembali default (${r.ms} ms)` : 'Default tidak merespon', r.ok ? 'success' : 'error')
+                }}
+                className="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-700 font-bold text-xs hover:bg-slate-50 disabled:opacity-50"
+              >
+                Reset ke Default
+              </button>
+              <button
+                disabled={testing}
+                onClick={async () => {
+                  setTesting(true)
+                  const r = await pingBaseUrl(serverUrl)
+                  setTesting(false)
+                  showToast(r.ok ? `Backend aktif (${r.ms} ms)` : `Gagal (${r.ms} ms)`, r.ok ? 'success' : 'error')
+                }}
+                className="px-3 py-1.5 rounded-lg border border-slate-300 text-slate-700 font-semibold text-xs hover:bg-slate-50 disabled:opacity-50"
+              >
+                Tes Koneksi
+              </button>
+            </div>
           </div>
 
           <div className="p-4 rounded-xl bg-slate-50 border border-slate-100 space-y-3">
