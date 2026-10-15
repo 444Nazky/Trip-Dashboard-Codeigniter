@@ -1,24 +1,20 @@
-// ─── App Version API ─────────────────────────────────────────────────────────
-// GET /api/v1/app-version?current=:version
-// GET /api/v1/release-notes/:version
-
 const express = require('express');
 const router = express.Router();
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
-
-// Path to APK storage and metadata
 const APK_DIR = path.join(__dirname, '..', '..', 'apks');
 const METADATA_DIR = path.join(__dirname, '..', '..', 'metadata');
 
-// Ensure directories exist
+
+
 function ensureDirs() {
   if (!fs.existsSync(APK_DIR)) fs.mkdirSync(APK_DIR, { recursive: true });
   if (!fs.existsSync(METADATA_DIR)) fs.mkdirSync(METADATA_DIR, { recursive: true });
 }
 
-// Load version metadata
+
+
 function loadVersionMetadata() {
   ensureDirs();
   const metadataPath = path.join(METADATA_DIR, 'versions.json');
@@ -33,14 +29,16 @@ function loadVersionMetadata() {
   return null;
 }
 
-// Save version metadata
+
+
 function saveVersionMetadata(metadata) {
   ensureDirs();
   const metadataPath = path.join(METADATA_DIR, 'versions.json');
   fs.writeFileSync(metadataPath, JSON.stringify(metadata, null, 2));
 }
 
-// Compare semantic versions
+
+
 function compareVersions(current, latest) {
   const parse = (v) => v.split('.').map(Number);
   const [c1, c2, c3] = parse(current);
@@ -52,7 +50,8 @@ function compareVersions(current, latest) {
   return 0;
 }
 
-// GET /api/v1/app-version?current=:version
+
+
 router.get('/app-version', (req, res) => {
   try {
     const { current = '0.0.0' } = req.query;
@@ -77,7 +76,6 @@ router.get('/app-version', (req, res) => {
     const apkPath = path.join(APK_DIR, `app-${latestVersion}.apk`);
     const apkExists = fs.existsSync(apkPath);
 
-    // Calculate APK size and hash
     let apkSize = null;
     let apkHash = null;
 
@@ -85,7 +83,6 @@ router.get('/app-version', (req, res) => {
       const stats = fs.statSync(apkPath);
       apkSize = stats.size;
 
-      // Calculate SHA-256 hash
       const fileBuffer = fs.readFileSync(apkPath);
       const hashSum = crypto.createHash('sha256');
       hashSum.update(fileBuffer);
@@ -112,14 +109,14 @@ router.get('/app-version', (req, res) => {
   }
 });
 
-// GET /api/v1/release-notes/:version
+
+
 router.get('/release-notes/:version', (req, res) => {
   try {
     const { version } = req.params;
     const metadata = loadVersionMetadata();
 
     if (!metadata || !metadata.releases || !metadata.releases[version]) {
-      // Try to find version in latest
       if (metadata?.latest?.version === version) {
         return res.json({
           version,
@@ -151,12 +148,10 @@ router.get('/release-notes/:version', (req, res) => {
   }
 });
 
-// POST /api/v1/publish-version (Admin only - untuk publish APK baru)
-// Body: { version, apkPath, releaseNotes, isForceUpdate, minVersion }
+
+
 router.post('/publish-version', (req, res) => {
   try {
-    // TODO: Add admin authentication check
-    // For now, require a secret header
     const secret = req.headers['x-publish-secret'];
     const expectedSecret = process.env.PUBLISH_SECRET || 'trip-angkut-secret';
 
@@ -176,7 +171,6 @@ router.post('/publish-version', (req, res) => {
       });
     }
 
-    // Validate version format (semver)
     const semverRegex = /^\d+\.\d+\.\d+$/;
     if (!semverRegex.test(version)) {
       return res.status(400).json({
@@ -187,7 +181,6 @@ router.post('/publish-version', (req, res) => {
 
     ensureDirs();
 
-    // Handle APK upload (base64 encoded)
     if (apkBase64) {
       try {
         const apkBuffer = Buffer.from(apkBase64, 'base64');
@@ -202,7 +195,6 @@ router.post('/publish-version', (req, res) => {
       }
     }
 
-    // Update metadata
     const metadata = loadVersionMetadata() || { latest: null, releases: {} };
 
     const releaseData = {
@@ -214,12 +206,10 @@ router.post('/publish-version', (req, res) => {
       minVersion: minVersion || null
     };
 
-    // Update latest if this version is newer
     if (!metadata.latest || compareVersions(metadata.latest.version, version) < 0) {
       metadata.latest = releaseData;
     }
 
-    // Store release data
     metadata.releases[version] = releaseData;
 
     saveVersionMetadata(metadata);
@@ -237,5 +227,7 @@ router.post('/publish-version', (req, res) => {
     });
   }
 });
+
+
 
 module.exports = router;

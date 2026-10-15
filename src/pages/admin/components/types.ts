@@ -7,6 +7,8 @@ export type AdminTab =
   | 'reports'
   | 'settings'
 
+
+
 export interface TariffRow {
   id?: string
   golongan: string
@@ -17,6 +19,8 @@ export interface TariffRow {
   emptyNum: number
   desc: string
 }
+
+
 
 export interface RouteRow {
   id: string
@@ -31,6 +35,8 @@ export interface RouteRow {
   region_name?: string
 }
 
+
+
 export interface RouteDermaga {
   id: string
   region_id: string
@@ -39,6 +45,8 @@ export interface RouteDermaga {
   region_name?: string
   region_code?: string
 }
+
+
 
 export interface RouteFormState {
   dermaga_id: string
@@ -50,14 +58,18 @@ export interface RouteFormState {
   geofencePoints: GeofencePoint[]
 }
 
+
+
 export interface GeofencePoint {
-  id?: string          // local id for new points
+  id?: string
   locationName: string
   latitude: string
   longitude: string
   radiusMeters: string
   description: string
 }
+
+
 
 export const emptyRouteForm: RouteFormState = {
   dermaga_id: '',
@@ -69,12 +81,16 @@ export const emptyRouteForm: RouteFormState = {
   geofencePoints: [],
 }
 
+
+
 export interface DermagaAccess {
   id: string
   code?: string
   name: string
   region_id?: string
 }
+
+
 
 export interface Officer {
   id: string
@@ -91,6 +107,8 @@ export interface Officer {
   joined: string
   dermagaAccess?: DermagaAccess[]
 }
+
+
 
 export interface BackendOfficerRow {
   id: string

@@ -20,28 +20,24 @@ import { resolvePhotoUrl } from './components/PhotoViewer'
 import { fetchGeofenceRules, type GeofenceRule } from '../../services/geofences'
 import { locationDistanceText, nearestGeofence } from '../../services/locationDistance'
 
-const fmtRp = (n: number) => `Rp ${Number(n || 0).toLocaleString('id-ID')}`
 
-// Foto disajikan backend di `origin/uploads/...` (bukan di bawah /api), jadi
-// URL-nya disusun dari asal server API — sama dengan resolusi di Laporan.
-// Catatan: `import.meta.env` TIDAK ada di build Angular (esbuild), pemakaian
-// sebelumnya membuat dashboard blank saat runtime.
+
+const fmtRp = (n: number) => `Rp ${Number(n || 0).toLocaleString('id-ID')}`
 const fotoUrl = (path: string | null | undefined) => {
   if (!path) return null
   return resolvePhotoUrl(path, environment.apiBaseUrl)
 }
+
+
 
 const fmtCoords = (lat?: number | null, lng?: number | null) => {
   if (!lat || !lng) return null
   return { lat: Number(lat).toFixed(5), lng: Number(lng).toFixed(5), gmaps: `https://www.google.com/maps?q=${lat},${lng}` }
 }
 
-/**
- * Sel Lokasi di matrix VEH — sekarang memuat JARAK ke titik geofence terdekat:
- * { dist: "80m dari SBDZ", lat/lng koordinat foto, gmaps link }. `dist` null
- * bila geofence belum ada/koordinat invalid — UI memakai fallback koordinat.
- */
 type LocCell = { dist: string | null; lat: string; lng: string; gmaps: string; tooltip?: string }
+
+
 
 const ThumbnailCell = ({ foto_path, no_trip, label }: { foto_path: string | null | undefined; no_trip: string; label?: string }) => {
   const url = fotoUrl(foto_path)
@@ -93,14 +89,10 @@ const ThumbnailCell = ({ foto_path, no_trip, label }: { foto_path: string | null
 type ViewMode = 'trip' | 'vehicle'
 type LoadState = 'loading' | 'ready' | 'offline'
 
+
+
 const AUTO_REFRESH_MS = 15_000
 
-/**
- * Baris kendaraan (SEJAJAR dengan vehHeader 13 kolom):
- * 0 = '#', 1 = No Trip, 2 = Tanggal, 3 = Jam, 4 = Tempat, 5 = No. Polisi,
- * 6 = Unit (label per jenis: "Truk 1", "Mobil 1"), 7 = Jenis, 8 = Golongan,
- * 9 = Kategori, 10 = Tarif, 11 = foto (string|null), 12 = lokasi (LocCell|null)
- */
 interface VehRow extends Array<string | number | LocCell | null> {
   0: number; 1: string; 2: string; 3: string; 4: string; 5: string;
   6: string; 7: string; 8: string; 9: string; 10: number;
@@ -109,13 +101,17 @@ interface VehRow extends Array<string | number | LocCell | null> {
   length: 13;
 }
 
+
+
 const asVehRow = (r: [number, string, string, string, string, string, string, string, string, string, number, string | null, LocCell | null]): VehRow => r as unknown as VehRow
+
+
 
 export default function ReportSheet() {
   const [rows, setRows] = useState<ReportTrip[]>([])
   const [filters, setFilters] = useState<ReportFilters>({})
   const [options, setOptions] = useState<ReportFilterOptions>({ golongan: [], vehicleTypes: [] })
-  /** Titik geofence (Master Rute) — untuk menghitung jarak kolom Lokasi. */
+
   const [geoRules, setGeoRules] = useState<GeofenceRule[]>([])
   const [state, setState] = useState<LoadState>('loading')
   const [view, setView] = useState<ViewMode>('trip')
@@ -138,8 +134,6 @@ export default function ReportSheet() {
     setLastSync(new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' }))
   }, [])
 
-  // Titik geofence Master Rute — dimuat sekali, dipakai semua baris untuk menghitung jarak.
-  // Gagal (offline/cfg belum ada) → kolom Lokasi jatuh ke tampilan koordinat (bukan kosong).
   useEffect(() => {
     alive.current = true
     fetchGeofenceRules().then(rules => {
@@ -148,7 +142,6 @@ export default function ReportSheet() {
     return () => { alive.current = false }
   }, [])
 
-  // Muat pertama + sinkronisasi otomatis 15 detik
   useEffect(() => {
     alive.current = true
     void load(filters)
@@ -172,8 +165,7 @@ export default function ReportSheet() {
   const vehMatrix = useMemo(() => vehFlat.map(({ t, v }, i) => {
     const d = formatReportDateTime(t.created_at)
     const base = fmtCoords(v.latitude, v.longitude)
-    // Kolom Lokasi: "80m dari SBDZ" fungsipi jarak foto→titik geofence terdekat.
-    // Tanpa konfigurasi geofence/koordinat → fallback koordinat mentah.
+
     const nd = nearestGeofence({ latitude: v.latitude, longitude: v.longitude }, geoRules)
     const loc: LocCell | null = base && {
       dist: locationDistanceText({ latitude: v.latitude, longitude: v.longitude }, geoRules),
@@ -198,11 +190,11 @@ export default function ReportSheet() {
 
   const buildSheets = () => {
     const now = new Date()
-    // Excel matrix — hanya string | number | null untuk XlsxSheet.rows
+
     const vehExcelMatrix: (string | number | null)[][] = vehMatrix.map(r => [
       r[0], r[1], r[2], r[3], r[4], r[5], r[6], r[7], r[8], r[9], r[10],
       fotoUrl(r[11]) || null,
-      // Kolom Lokasi: jarak + koordinat foto tetap tersalin agar bisa diverifikasi
+
       r[12] ? (r[12].dist || `${r[12].lat}, ${r[12].lng}`) : null,
     ])
     const meta: (string | number | null)[][] = [
@@ -222,11 +214,9 @@ export default function ReportSheet() {
   }
 
   const copyTsv = async () => {
-    // TSV matrix — flatten kolom kompleks (Foto=objek, Lokasi=objek) ke string
     const tsvRows = matrix.map(r => r.map((cell, ci) => {
       if (view === 'vehicle' && ci === 11) return fotoUrl(cell as string | null) || '-'
       if (view === 'vehicle' && ci === 12) {
-        // TSV: jarak ke titik ("80m dari SBDZ") — koordinat tetap dilink via kolom terpisah di Excel
         const loc = cell as LocCell | null
         return loc?.dist || (loc ? `${loc.lat}, ${loc.lng}` : '-')
       }
@@ -265,7 +255,7 @@ export default function ReportSheet() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800">
-      {/* Header */}
+
       <header className="sticky top-0 z-30 bg-white border-b border-slate-200 shadow-sm">
         <div className="px-5 py-3 flex items-center gap-3 flex-wrap">
           <span className="w-9 h-9 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0">
@@ -309,7 +299,6 @@ export default function ReportSheet() {
           </button>
         </div>
 
-        {/* Filter */}
         <div className="px-5 pb-3 flex flex-wrap items-end gap-3">
           <label className="text-[11px] font-bold text-slate-500">
             Dari
@@ -352,7 +341,6 @@ export default function ReportSheet() {
           <span className="ml-auto text-[11px] text-slate-400 font-semibold self-center">Sinkron ke-{tick + 1}</span>
         </div>
 
-        {/* Tab lembar */}
         <div className="px-5 flex items-end gap-1 -mb-px">
           {([['trip', 'Laporan Trip'], ['vehicle', 'Detail Kendaraan']] as const).map(([key, label]) => (
             <button key={key} onClick={() => setView(key)}
@@ -365,7 +353,6 @@ export default function ReportSheet() {
         </div>
       </header>
 
-      {/* Grid */}
       <main className="p-5">
         <div className="bg-white border border-slate-200 shadow-sm rounded-2xl overflow-hidden">
           <div className="overflow-auto max-h-[calc(100vh-220px)]">
@@ -394,7 +381,6 @@ export default function ReportSheet() {
                 ) : matrix.map((r, idx) => (
                   <tr key={idx} className={idx % 2 === 1 ? 'bg-slate-50/60' : ''}>
                     {r.map((cell, ci) => {
-                      // Kolom Foto (index 11 di VehRow) — render sebagai thumbnail
                       if (view === 'vehicle' && ci === 11) {
                         const fotoPath = cell as string | null
                         const noTrip = r[1] as string
@@ -405,7 +391,7 @@ export default function ReportSheet() {
                           </td>
                         )
                       }
-                      // Kolom Lokasi (index 12 di VehRow) — "80m dari SBDZ" + link maps
+
                       if (view === 'vehicle' && ci === 12) {
                         const loc = cell as LocCell | null
                         if (!loc) return <td key={ci} className="px-3 py-2 border-b border-slate-100 text-slate-300 italic text-[11px]">-</td>

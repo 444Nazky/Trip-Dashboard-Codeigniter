@@ -1,6 +1,6 @@
-// ─── API Service ──────────────────────────────────────────────────────────────
-
 import { environment } from '../environments/environment'
+
+
 
 const TOKEN_KEY = 'trip.auth.token.v1'
 
@@ -15,14 +15,15 @@ interface ApiResponse<T> {
   ok: boolean
 }
 
+
+
 class ApiService {
   private _token: string | null = null
 
   constructor() {
-    // Load token from localStorage on init
     try {
       this._token = localStorage.getItem(TOKEN_KEY)
-    } catch { /* ignore */ }
+    } catch {}
   }
 
   get token() { return this._token }
@@ -35,7 +36,7 @@ class ApiService {
       } else {
         localStorage.removeItem(TOKEN_KEY)
       }
-    } catch { /* quota */ }
+    } catch {}
   }
 
   private async request<T>(
@@ -51,8 +52,6 @@ class ApiService {
     }
 
     try {
-      // Timeout 12s — kalau base URL salah/host mati, request dibatalkan
-      // dan login menampilkan error, bukan loading selamanya.
       const controller = new AbortController()
       const timer = setTimeout(() => controller.abort(), 12000)
 
@@ -71,7 +70,6 @@ class ApiService {
       const data = await res.json().catch(() => ({}))
 
       if (!res.ok) {
-        // Clear token on auth errors
         if (res.status === 401) {
           this.setToken(null)
         }
@@ -93,10 +91,11 @@ class ApiService {
   put<T>(path: string, body?: unknown) { return this.request<T>('PUT', path, body) }
   delete<T>(path: string) { return this.request<T>('DELETE', path) }
 
-  /** GET yang langsung mengembalikan data, atau null bila gagal/kosong. */
   getOk<T>(path: string): Promise<T | null> {
     return this.get<T>(path).then(r => (r.ok && r.data ? r.data : null))
   }
 }
+
+
 
 export const api = new ApiService()

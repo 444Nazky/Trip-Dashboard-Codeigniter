@@ -15,7 +15,6 @@ import { environment } from '../../environments/environment'
 import LoginPage from '../LoginPage'
 import ReportSheet from './ReportSheet'
 
-// Tabs
 import { OverviewTab } from './tabs/OverviewTab'
 import { TariffTab } from './tabs/TariffTab'
 import { PlatesTab } from './tabs/PlatesTab'
@@ -23,6 +22,8 @@ import { RoutesTab } from './tabs/RoutesTab'
 import { OfficersTab } from './tabs/OfficersTab'
 import { ReportsTab } from './tabs/ReportsTab'
 import { SettingsTab } from './tabs/SettingsTab'
+
+
 
 export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [tariffs, setTariffs] = useState<TariffRow[]>([])
@@ -36,12 +37,9 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
   const [dashSummary, setDashSummary] = useState<{ totalTrips: number; totalRevenue: number; totalVehicles: number } | null>(null)
   const [dashAt, setDashAt] = useState('')
 
-  // Gerbang login admin — muncul HANYA saat server menolak kredensial
-  // (mis. password sudah diganti lewat menu Pengaturan), bukan saat offline.
   const [authDenied, setAuthDenied] = useState(false)
   const [authRetry, setAuthRetry] = useState(0)
 
-  // Mode Spreadsheet Live (tab baru dibuka dari tombol "Ekspor Spreadsheet" — `#/sheet`)
   const [sheetMode, setSheetMode] = useState(() => typeof window !== 'undefined' && window.location.hash === '#/sheet')
   useEffect(() => {
     const onHash = () => setSheetMode(window.location.hash === '#/sheet')
@@ -54,7 +52,6 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
     setTimeout(() => setToast(null), 3000)
   }
 
-  // Merge backend officers
   function mergeBackendOfficers(rows: BackendOfficerRow[], prev: Officer[]): Officer[] {
     return rows.map(b => {
       const old = prev.find(o => String(o.id) === String(b.id)) ?? prev.find(o => o.name === b.name)
@@ -71,7 +68,7 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
       }
     })
   }
-  
+
   useEffect(() => { applyTheme(loadTheme()) }, [])
 
   useEffect(() => {
@@ -106,7 +103,7 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
       if (sess.authDenied) { setAuthDenied(true); return }
       setServerState('offline'); return
     }
-    // Ringkasan khusus HARI INI (WIB) — dipakai kartu "Trip/Pendapatan/Unit Hari Ini"
+
     const today = dayKeyWib(new Date().toISOString())
     const [trips, summ] = await Promise.all([fetchTrips(), fetchReportSummary(today, today)])
     if (trips) setServerTrips(trips)
@@ -129,11 +126,10 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
     { key: 'routes', label: 'Master Rute', Icon: MapPin },
     { key: 'officers', label: 'Petugas', Icon: Users },
     { key: 'reports', label: 'Laporan', Icon: BarChart2 },
-    // Geofencing tab dihapus - fitur sudah di Master Rute
+
     { key: 'settings', label: 'Pengaturan', Icon: Settings },
   ]
 
-  // Kredensial ditolak (password diganti) → form login seragam, tanpa form terpisah
   if (authDenied) return (
     <LoginPage onLogin={() => { setAuthDenied(false); setAuthRetry(k => k + 1) }} />
   )
@@ -148,14 +144,12 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
         <img src="/Assets/karyamasv.svg" alt="Logo" className="w-full h-full object-contain" />
       </div>
 
-
       <div>
         <p className="text-white font-black text-[14px]">Dashboard Trip</p>
         <p className="text-slate-500 text-[10px]">Karyamas Plantation</p>
       </div>
     </div>
   </div>
-
 
         <nav className="flex-1 p-3 space-y-0.5">
           {navItems.map(({ key, label, Icon }) => (
@@ -174,7 +168,6 @@ export default function AdminDashboard({ onLogout }: { onLogout: () => void }) {
         </div>
       </div>
 
-      {/* Content — latar off-white agar kartu putih punya kontras & batas jelas */}
       <div className="flex-1 ml-64 bg-slate-50 min-h-screen">
         <div className="p-8 max-w-[1400px]">
           {tab === 'overview' && (

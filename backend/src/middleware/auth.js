@@ -1,10 +1,8 @@
 const jwt = require('jsonwebtoken');
-
-// JWT_SECRET from environment — uses a deterministic fallback only for local dev
-// when JWT_SECRET is not set. Railway deployments MUST have JWT_SECRET configured.
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-do-not-use-in-production';
 
-// Attach req.user / req.officer if the JWT is valid
+
+
 function authenticate(req, res, next) {
   try {
     const authHeader = req.headers.authorization;
@@ -30,12 +28,15 @@ function authenticate(req, res, next) {
   }
 }
 
-// Must be used after authenticate — gates routes to admin role only
+
+
 function requireAdmin(req, res, next) {
   if (!req.user || req.user.role !== 'admin') {
     return res.status(403).json({ error: 'Admin access required' });
   }
   next();
 }
+
+
 
 module.exports = { authenticate, requireAdmin, JWT_SECRET };

@@ -3,37 +3,30 @@ const Database = require('better-sqlite3');
 const bcrypt = require('bcryptjs');
 const { randomUUID } = require('crypto');
 const fs = require('fs');
-
 const DB_PATH = process.env.DB_PATH || path.join(__dirname, '../../data/trip.db');
-
-// Ensure data directory exists
 const dataDir = path.dirname(DB_PATH);
 if (!fs.existsSync(dataDir)) {
   fs.mkdirSync(dataDir, { recursive: true });
 }
 
+
+
 const fresh = !fs.existsSync(DB_PATH);
 const db = new Database(DB_PATH);
 
-// Schema migrations for databases created before the column existed.
-// Runs on every boot; swallows the "duplicate column" error when present.
+
+
 function migrate() {
   try {
     db.exec(`ALTER TABLE tariffs ADD COLUMN description TEXT DEFAULT ''`);
-  } catch (e) {
-    // column already exists — nothing to do
-  }
+  } catch (e) {}
 
-  // Kolom login petugas. DB lama (dibuat sebelum revisi login per-username)
-  // tidak punya kolom ini → query lama gagal dengan "no such column: username".
   try {
     db.exec(`ALTER TABLE officers ADD COLUMN username TEXT`);
     console.log('Migrated: officers.username column added');
-  } catch (e) {
-    // kolom sudah ada — lanjut backfill baris yang masih kosong
-  }
+  } catch (e) {}
   for (const t of ['dermagas', 'routes']) {
-    try { db.exec(`ALTER TABLE ${t} ADD COLUMN username TEXT`); } catch (e) { /* sudah ada */ }
+    try { db.exec(`ALTER TABLE ${t} ADD COLUMN username TEXT`); } catch (e) {}
   }
   try {
     db.exec(`
@@ -41,10 +34,8 @@ function migrate() {
          SET username = LOWER(REPLACE(name, ' ', ''))
        WHERE username IS NULL OR username = ''
     `);
-  } catch (e) { /* tidak fatal */ }
+  } catch (e) {}
 
-  // ── Registrasi & penarifan nomor plat ──────────────────────────────────────
-  // Semua CREATE bersifat idempotent agar DB lama ikut termigrasi.
   db.exec(`
     CREATE TABLE IF NOT EXISTS vehicle_plates (
       id TEXT PRIMARY KEY,
@@ -58,7 +49,6 @@ function migrate() {
     )
   `);
 
-  // Konfigurasi tarif terpusat per region: (region_id, jenis_tarif) → nominal.
   db.exec(`
     CREATE TABLE IF NOT EXISTS region_tariffs (
       id TEXT PRIMARY KEY,
@@ -71,7 +61,6 @@ function migrate() {
     )
   `);
 
-  // Many-to-many petugas ↔ region.
   db.exec(`
     CREATE TABLE IF NOT EXISTS officer_regions (
       officer_id TEXT NOT NULL,
@@ -82,7 +71,6 @@ function migrate() {
     )
   `);
 
-  // Log transaksi scan plat (jejak penarifan).
   db.exec(`
     CREATE TABLE IF NOT EXISTS plate_scans (
       id TEXT PRIMARY KEY,
@@ -96,7 +84,6 @@ function migrate() {
     )
   `);
 
-  // Titik geofence per rute (kode rute = "ASAL-TUJUAN", dipakai admin dashboard).
   db.exec(`
     CREATE TABLE IF NOT EXISTS geofences (
       id TEXT PRIMARY KEY,
@@ -120,23 +107,20 @@ function migrate() {
     ['trips', 'completed_at', 'TEXT'],
     ['vehicles', 'foto_captured_at', 'TEXT'],
   ]) {
-    try { db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`); } catch (e) { /* already exists */ }
+    try { db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`); } catch (e) {}
   }
-  // Urutan penting: wilayah spec dibuat dulu, baru seedSpecTables memberi
-  // tarif region (lokal/eksternal) untuk region yang baru saja ditambahkan.
+
   ensureSpecRegions();
   seedSpecTables();
 }
 
-// trips.dermaga_id dibuat NOT NULL oleh revisi akses, tetapi klien mobile tidak
-// pernah mengirim dermaga — akibatnya setiap POST /trips gagal 500 dan tidak ada
-// trip yang tersinkron. SQLite tidak mendukung ALTER COLUMN, jadi tabel dibangun
-// ulang dengan kolom nullable.
+
+
 function relaxTripsDermagaNotNull() {
   try {
     const col = db.prepare(`PRAGMA table_info(trips)`).all()
       .find((c) => c.name === 'dermaga_id');
-    if (!col || col.notnull !== 1) return; // sudah nullable / belum ada
+    if (!col || col.notnull !== 1) return;
 
     db.exec(`
       CREATE TABLE trips_relaxed (
@@ -171,15 +155,12 @@ function relaxTripsDermagaNotNull() {
     db.exec(`ALTER TABLE trips_relaxed RENAME TO trips`);
     console.log('Migrated: trips.dermaga_id is now nullable');
   } catch (e) {
-    // Migrasi gagal tidak boleh menggagalkan boot.
     console.warn('Skip trips.dermaga_id migration:', e.message);
   }
 }
 
-// ── Revisi #3 & #4: Master Rute Wilayah Operasional ───────────────────────────
-// 3 wilayah × 2 dermaga × 2 rute (dua arah), petugas contoh per wilayah,
-// dan password wilayah default "<kode>123" (mis. BADAU → badau123).
-// Idempotent: jalan tiap boot dan melengkapi DB lama tanpa menimpa data sedia.
+
+
 const SPEC_WILAYAH = [
   {
     code: 'ENTIKONG', name: 'Entikong',
@@ -223,6 +204,8 @@ const SPEC_WILAYAH = [
   },
 ];
 
+
+
 const DEMO_OFFICERS = [
   { name: 'Budi Santoso', region: 'BADAU', docks: ['D1'] },
   { name: 'Andi Pratama', region: 'BADAU', docks: ['D2'] },
@@ -234,13 +217,16 @@ const DEMO_OFFICERS = [
   { name: 'Maya Sari', region: 'KELAPAKAMPIT', docks: ['D2'] },
 ];
 
+
+
 const regionDefaultPassword = (code) => `${String(code).toLowerCase()}123`;
 
-// Penuhi spesifikasi wilayah operasional (idempotent, aman untuk DB lama).
+
+
 function ensureSpecRegions() {
   try {
     db.exec(`ALTER TABLE regions ADD COLUMN password TEXT`);
-  } catch (e) { /* kolom sudah ada */ }
+  } catch (e) {}
 
   const hashedPin = bcrypt.hashSync('123456', 10);
 
@@ -258,7 +244,6 @@ function ensureSpecRegions() {
         .run(bcrypt.hashSync(regionDefaultPassword(w.code), 10), region.id);
     }
 
-    // Dua dermaga: D1 & D2
     for (const [dc, dname] of [['D1', 'Dermaga 1'], ['D2', 'Dermaga 2']]) {
       let dm = db.prepare(`SELECT * FROM dermagas WHERE region_id = ? AND code = ?`).get(region.id, dc);
       if (!dm) {
@@ -270,8 +255,6 @@ function ensureSpecRegions() {
 
       const specRoutes = w.routes.filter(r => r.d === dc);
 
-      // Samakan isi dermaga dengan Master Rute: rute yang tidak ada di
-      // spesifikasi dihapus — kecuali masih direferensikan trip.
       {
         const olds = db.prepare(`SELECT id, route_from, route_to FROM routes WHERE dermaga_id = ?`).all(dm.id);
         const wanted = specRoutes.map(r => `${r.from}|${r.to}`);
@@ -295,7 +278,6 @@ function ensureSpecRegions() {
       }
     }
 
-    // Backfill legacy officers without dock access to D1.
     const noAccess = db.prepare(`
       SELECT o.id FROM officers o
       WHERE o.region_id = ?
@@ -310,8 +292,6 @@ function ensureSpecRegions() {
     }
   }
 
-  // Keep the published demo accounts aligned with their documented region
-  // and dock access, including existing databases created with older seeds.
   for (const demo of DEMO_OFFICERS) {
     const region = db.prepare(`SELECT id FROM regions WHERE code = ?`).get(demo.region);
     if (!region) continue;
@@ -338,7 +318,6 @@ function ensureSpecRegions() {
     }
   }
 
-  // Region lain (DB lama) juga mendapat password default
   const noPw = db.prepare(`SELECT id, code FROM regions WHERE password IS NULL OR password = ''`).all();
   for (const r of noPw) {
     db.prepare(`UPDATE regions SET password = ? WHERE id = ?`)
@@ -346,7 +325,8 @@ function ensureSpecRegions() {
   }
 }
 
-// Seed relasi petugas-region (backfill dari kolom lama) + tarif region default.
+
+
 function seedSpecTables() {
   db.exec(`INSERT OR IGNORE INTO officer_regions (officer_id, region_id) SELECT id, region_id FROM officers`);
 
@@ -359,8 +339,9 @@ function seedSpecTables() {
   }
 }
 
+
+
 function initialize() {
-  // Regions table
   db.exec(`
     CREATE TABLE IF NOT EXISTS regions (
       id TEXT PRIMARY KEY,
@@ -370,7 +351,6 @@ function initialize() {
     )
   `);
 
-  // Dermagas table (pier/wharf within a region)
   db.exec(`
     CREATE TABLE IF NOT EXISTS dermagas (
       id TEXT PRIMARY KEY,
@@ -383,7 +363,6 @@ function initialize() {
     )
   `);
 
-  // Routes table (linked to dermaga)
   db.exec(`
     CREATE TABLE IF NOT EXISTS routes (
       id TEXT PRIMARY KEY,
@@ -399,7 +378,6 @@ function initialize() {
     )
   `);
 
-  // Officers table
   db.exec(`
     CREATE TABLE IF NOT EXISTS officers (
       id TEXT PRIMARY KEY,
@@ -413,7 +391,6 @@ function initialize() {
     )
   `);
 
-  // Officer-Dermaga access (many-to-many)
   db.exec(`
     CREATE TABLE IF NOT EXISTS officer_dermagas (
       officer_id TEXT NOT NULL,
@@ -424,7 +401,6 @@ function initialize() {
     )
   `);
 
-  // Tariffs table
   db.exec(`
     CREATE TABLE IF NOT EXISTS tariffs (
       id TEXT PRIMARY KEY,
@@ -437,7 +413,6 @@ function initialize() {
     )
   `);
 
-  // Vehicles table
   db.exec(`
     CREATE TABLE IF NOT EXISTS vehicles (
       id TEXT PRIMARY KEY,
@@ -458,14 +433,13 @@ function initialize() {
     )
   `);
 
-  // Trips table
   db.exec(`
     CREATE TABLE IF NOT EXISTS trips (
       id TEXT PRIMARY KEY,
       no_trip TEXT NOT NULL UNIQUE,
       officer_id TEXT NOT NULL,
       region_id TEXT NOT NULL,
-      dermaga_id TEXT NOT NULL,
+      dermaga_id TEXT,
       route_id TEXT,
       status_muatan TEXT NOT NULL,
       route_from TEXT,
@@ -486,7 +460,6 @@ function initialize() {
     )
   `);
 
-  // Trip_vehicles junction table
   db.exec(`
     CREATE TABLE IF NOT EXISTS trip_vehicles (
       id TEXT PRIMARY KEY,
@@ -499,8 +472,9 @@ function initialize() {
   `);
 }
 
+
+
 function seedData() {
-  // Region sudah diisi ensureSpecRegions() — di sini hanya tarif default.
   const result = db.prepare('SELECT COUNT(*) as count FROM tariffs').get();
   if (result.count > 0) return;
 
@@ -523,5 +497,7 @@ function seedData() {
 if (fresh) initialize();
 migrate();
 seedData();
+
+
 
 module.exports = { db };

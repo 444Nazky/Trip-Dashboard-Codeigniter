@@ -1,6 +1,9 @@
 import { X, Camera } from 'lucide-react'
 import { useState } from 'react'
 
+
+
+
 interface Photo {
   id: string
   url: string
@@ -14,6 +17,8 @@ interface PhotoViewerProps {
   baseUrl?: string
 }
 
+
+
 export function resolvePhotoUrl(url: string, baseUrl = ''): string {
   if (/^(https?:|data:|blob:)/i.test(url)) return url
   try {
@@ -23,6 +28,8 @@ export function resolvePhotoUrl(url: string, baseUrl = ''): string {
     return `${baseUrl.replace(/\/api\/?$/, '')}${url}`
   }
 }
+
+
 
 export function PhotoViewer({ photos, onClose, baseUrl = '' }: PhotoViewerProps) {
   const [lightboxPhoto, setLightboxPhoto] = useState<Photo | null>(() => photos.length === 1 ? photos[0] : null)

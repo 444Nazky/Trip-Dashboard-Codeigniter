@@ -3,6 +3,9 @@ import type { ReportSummary, BackendTrip } from '../../../services/trips'
 import { formatReportDateTime } from '../../../services/trips'
 import { CurrencyDisplay } from '../components/CurrencyDisplay'
 
+
+
+
 interface OverviewTabProps {
   serverTrips: BackendTrip[]
   dashSummary: ReportSummary | null
@@ -15,6 +18,8 @@ interface OverviewTabProps {
   onRefresh: () => void
   onOpenReports: () => void
 }
+
+
 
 export function OverviewTab({
   serverTrips,
@@ -34,7 +39,7 @@ export function OverviewTab({
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+
       <div className="flex items-end justify-between gap-4 flex-wrap">
         <div>
           <h3 className="font-black text-slate-900 text-lg"> Overview</h3>
@@ -67,7 +72,6 @@ export function OverviewTab({
         </div>
       </div>
 
-      {/* Kartu metrik */}
       <div className="grid grid-cols-2 xl:grid-cols-4 bg-white border border-slate-200 shadow-sm rounded-2xl divide-x divide-slate-100 overflow-hidden">
         <MetricCard
           label="Trip Hari Ini"
@@ -97,7 +101,6 @@ export function OverviewTab({
         />
       </div>
 
-      {/* 5 trip terbaru */}
       <div className="bg-white border border-slate-200 shadow-sm rounded-2xl overflow-hidden">
         <div className="px-5 py-3.5 border-b border-slate-100 font-bold text-slate-800 flex justify-between items-center gap-3 flex-wrap">
           <span className="flex items-center gap-2 text-sm">
@@ -149,6 +152,8 @@ export function OverviewTab({
     </div>
   )
 }
+
+
 
 function MetricCard({
   label,

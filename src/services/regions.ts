@@ -1,7 +1,6 @@
-// ─── Regions API Service ──────────────────────────────────────────────────────
-// Daftar region (wilayah) — dipakai form admin & pemilihan region asal plat.
-
 import { api } from './api'
+
+
 
 export interface Region {
   id: string
@@ -9,7 +8,8 @@ export interface Region {
   code: string
 }
 
-/** null = server tidak terjangkau. */
+
+
 export async function fetchRegions(): Promise<Region[] | null> {
   return api.getOk<Region[]>('/regions')
 }

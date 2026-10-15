@@ -2,11 +2,16 @@ import { useState } from 'react'
 import { Lock, Check, X } from 'lucide-react'
 import { api } from '../../services/api'
 
+
+
+
 interface ChangePasswordProps {
   onLogout?: () => void
-  /** Called when logout completes — if provided, logout is left to the parent */
+
   showToast?: (msg: string, type?: 'success' | 'error') => void
 }
+
+
 
 export function ChangePasswordSection({ onLogout, showToast }: ChangePasswordProps) {
   const [done, setDone] = useState(false)
@@ -32,7 +37,7 @@ export function ChangePasswordSection({ onLogout, showToast }: ChangePasswordPro
         setErr(result.error?.message || 'Gagal menyimpan password.')
         return
       }
-      // Token sesi tetap berlaku; password TIDAK disimpan di browser.
+
       setDone(true)
       showToast?.('Password admin diganti.', 'success')
       setCur(''); setNext(''); setConfirm('')

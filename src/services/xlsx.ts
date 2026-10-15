@@ -1,14 +1,10 @@
-// ─── XLSX Writer (zero dependency) ────────────────────────────────────────────
-// Menulis berkas .xlsx yang valid tanpa pustaka eksternal.
-// Sebuah .xlsx pada dasarnya adalah arsip ZIP berisi XML SpreadsheetML, jadi
-// kita tulis ZIP metode "store" (tanpa kompresi) + CRC32 sendiri.
-
 export interface XlsxSheet {
-  /** Maksimal 31 karakter, tanpa karakter terlarang : * ? / \ [ ] */
   name: string
-  /** Baris data; sel kosong = null/undefined. Angka ditulis sebagai numerik. */
+
   rows: (string | number | null | undefined)[][]
 }
+
+
 
 const CRC_TABLE = (() => {
   const t = new Uint32Array(256)
@@ -20,17 +16,21 @@ const CRC_TABLE = (() => {
   return t
 })()
 
+
+
 function crc32(data: Uint8Array): number {
   let c = 0xffffffff
   for (let i = 0; i < data.length; i++) c = CRC_TABLE[(c ^ data[i]) & 0xff] ^ (c >>> 8)
   return (c ^ 0xffffffff) >>> 0
 }
 
-const encoder = new TextEncoder()
 
-// DOS time/date tetap (25 Sep 2026 12:00) — deterministik agar CRC stabil
+
+const encoder = new TextEncoder()
 const DOS_TIME = (12 << 11) | (0 << 5) | 0
 const DOS_DATE = ((2026 - 1980) << 9) | (9 << 5) | 25
+
+
 
 function concat(chunks: Uint8Array[]): Uint8Array {
   let total = 0
@@ -44,45 +44,51 @@ function concat(chunks: Uint8Array[]): Uint8Array {
   return out
 }
 
+
+
 function localHeader(nameLen: number, crc: number, size: number): Uint8Array {
   const b = new Uint8Array(30)
   const v = new DataView(b.buffer)
   v.setUint32(0, 0x04034b50, true)
-  v.setUint16(4, 20, true)   // version needed
-  v.setUint16(6, 0, true)    // flags
-  v.setUint16(8, 0, true)    // method: 0 = stored
+  v.setUint16(4, 20, true)
+  v.setUint16(6, 0, true)
+  v.setUint16(8, 0, true)
   v.setUint16(10, DOS_TIME, true)
   v.setUint16(12, DOS_DATE, true)
   v.setUint32(14, crc, true)
   v.setUint32(18, size, true)
   v.setUint32(22, size, true)
   v.setUint16(26, nameLen, true)
-  v.setUint16(28, 0, true)   // extra length
+  v.setUint16(28, 0, true)
   return b
 }
+
+
 
 function centralHeader(nameLen: number, crc: number, size: number, offset: number): Uint8Array {
   const b = new Uint8Array(46)
   const v = new DataView(b.buffer)
   v.setUint32(0, 0x02014b50, true)
-  v.setUint16(4, 20, true)   // version made by
-  v.setUint16(6, 20, true)   // version needed
-  v.setUint16(8, 0, true)    // flags
-  v.setUint16(10, 0, true)   // method: stored
+  v.setUint16(4, 20, true)
+  v.setUint16(6, 20, true)
+  v.setUint16(8, 0, true)
+  v.setUint16(10, 0, true)
   v.setUint16(12, DOS_TIME, true)
   v.setUint16(14, DOS_DATE, true)
   v.setUint32(16, crc, true)
   v.setUint32(20, size, true)
   v.setUint32(24, size, true)
   v.setUint16(28, nameLen, true)
-  v.setUint16(30, 0, true)   // extra
-  v.setUint16(32, 0, true)   // comment
-  v.setUint16(34, 0, true)   // disk start
-  v.setUint16(36, 0, true)   // internal attrs
-  v.setUint32(38, 0, true)   // external attrs
+  v.setUint16(30, 0, true)
+  v.setUint16(32, 0, true)
+  v.setUint16(34, 0, true)
+  v.setUint16(36, 0, true)
+  v.setUint32(38, 0, true)
   v.setUint32(42, offset, true)
   return b
 }
+
+
 
 function endOfCentralDirectory(count: number, cdSize: number, cdOffset: number): Uint8Array {
   const b = new Uint8Array(22)
@@ -98,7 +104,8 @@ function endOfCentralDirectory(count: number, cdSize: number, cdOffset: number):
   return b
 }
 
-/** Buat arsip ZIP (metode store) dari daftar berkas. */
+
+
 function buildZip(files: { name: string; data: Uint8Array }[]): Uint8Array {
   const localChunks: Uint8Array[] = []
   const centralChunks: Uint8Array[] = []
@@ -120,6 +127,8 @@ function buildZip(files: { name: string; data: Uint8Array }[]): Uint8Array {
   return concat([...localChunks, central, eocd])
 }
 
+
+
 function escapeXml(s: string): string {
   return s
     .replace(/&/g, '&amp;')
@@ -127,11 +136,12 @@ function escapeXml(s: string): string {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&apos;')
-    // Karakter yang tidak valid di XML 1.0
+
     .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '')
 }
 
-/** 0 → A, 25 → Z, 26 → AA */
+
+
 function colRef(index: number): string {
   let n = index
   let out = ''
@@ -142,10 +152,14 @@ function colRef(index: number): string {
   return out
 }
 
+
+
 function safeSheetName(name: string, fallback: string): string {
   const cleaned = (name || fallback).replace(/[:*?/\\[\]]/g, ' ').trim().slice(0, 31)
   return cleaned || fallback
 }
+
+
 
 function sheetXml(rows: XlsxSheet['rows']): string {
   const body = rows.map((row, r) => {
@@ -165,6 +179,8 @@ function sheetXml(rows: XlsxSheet['rows']): string {
     + `<sheetData>${body}</sheetData></worksheet>`
 }
 
+
+
 const STYLES_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>`
   + `<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">`
   + `<fonts count="1"><font><sz val="11"/><name val="Calibri"/></font></fonts>`
@@ -175,7 +191,8 @@ const STYLES_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>`
   + `<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>`
   + `</styleSheet>`
 
-/** Susun berkas .xlsx dari beberapa sheet. */
+
+
 export function buildXlsx(sheets: XlsxSheet[]): Uint8Array {
   const normalized = sheets.length > 0 ? sheets : [{ name: 'Sheet1', rows: [] }]
 
@@ -229,10 +246,11 @@ export function buildXlsx(sheets: XlsxSheet[]): Uint8Array {
   return buildZip(files)
 }
 
-/** Unduh berkas .xlsx ke perangkat pengguna. */
+
+
 export function downloadXlsx(filename: string, sheets: XlsxSheet[]): void {
   const bytes = buildXlsx(sheets)
-  // Salinan ke ArrayBuffer baru agar tipe BlobPart sesuai (Uint8Array<ArrayBufferLike>)
+
   const buffer = bytes.buffer.slice(
     bytes.byteOffset,
     bytes.byteOffset + bytes.byteLength,

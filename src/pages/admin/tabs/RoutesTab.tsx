@@ -6,9 +6,14 @@ import { isShortMapsLink, parseMapsUrl, resolveMapsShortLink, osmEmbeddedMapUrl,
 import type { RouteRow, RouteDermaga, RouteFormState, GeofencePoint } from '../components/types'
 import { emptyRouteForm } from '../components/types'
 
+
+
+
 interface RoutesTabProps {
   showToast: (msg: string, type?: 'success' | 'error') => void
 }
+
+
 
 export function RoutesTab({ showToast }: RoutesTabProps) {
   const [routeRows, setRouteRows] = useState<RouteRow[]>([])
@@ -17,18 +22,17 @@ export function RoutesTab({ showToast }: RoutesTabProps) {
   const [routeForm, setRouteForm] = useState<RouteFormState>(emptyRouteForm)
   const [editRouteId, setEditRouteId] = useState<string | null>(null)
 
-  // Geofence modal state
   const [showGeofencePanel, setShowGeofencePanel] = useState(false)
   const [geofencePoints, setGeofencePoints] = useState<GeofencePoint[]>([])
   const [activeGeofence, setActiveGeofence] = useState<GeofencePoint | null>(null)
   const [mapsLink, setMapsLink] = useState('')
   const [resolvingLink, setResolvingLink] = useState(false)
-  /** true → lat/lng terisi otomatis dari link Google Maps (input jadi read-only) */
+
   const [coordsFromLink, setCoordsFromLink] = useState(false)
-  /** true → admin membuka kunci input koordinat untuk koreksi manual */
+
   const [manualCoords, setManualCoords] = useState(false)
   const [currentRouteForGeofence, setCurrentRouteForGeofence] = useState<RouteRow | null>(null)
-  /** Timer debounce resolve short-link (agar tiap ketikan tidak menembak server). */
+
   const resolveTimer = useRef<number | null>(null)
 
   useEffect(() => () => {
@@ -98,8 +102,6 @@ export function RoutesTab({ showToast }: RoutesTabProps) {
     if (fresh) setRouteRows(fresh as RouteRow[])
   }
 
-  // ─── Geofence Management ─────────────────────────────────────────────────────
-
   const loadGeofencePoints = async (routeCode: string) => {
     if (!routeCode) return
     const points = await fetchGeofencePointsForRoute(routeCode)
@@ -148,8 +150,7 @@ export function RoutesTab({ showToast }: RoutesTabProps) {
   const startEditGeofence = (point: GeofencePoint) => {
     setActiveGeofence({ ...point })
     setMapsLink('')
-    // Titik lama sudah punya koordinat tersimpan → langsung mode manual agar
-    // admin bisa mengoreksi tanpa harus menempel ulang link.
+
     setCoordsFromLink(false)
     setManualCoords(true)
   }
@@ -161,16 +162,11 @@ export function RoutesTab({ showToast }: RoutesTabProps) {
     setManualCoords(false)
   }
 
-  /**
-   * Ekstrak koordinat dari teks link Google Maps (dipanggil otomatis saat
-   * paste/onChange — admin tidak perlu tekan tombol apa pun).
-   * Short link goo.gl/maps.app di-resolve dulu (async), lalu di-parse.
-   */
   const extractCoordsFromMapsLink = async (raw: string): Promise<ParsedGeo | null> => {
     const trimmed = raw.trim()
     if (!trimmed) return null
     let candidate = trimmed
-    // Short link perlu diikuti redirect-nya sebelum koordinat bisa dibaca
+
     if (isShortMapsLink(trimmed)) {
       setResolvingLink(true)
       const resolved = await resolveMapsShortLink(trimmed)
@@ -186,36 +182,30 @@ export function RoutesTab({ showToast }: RoutesTabProps) {
     return parsed
   }
 
-  /** Terapkan hasil parsing ke form: isi lat/lng + default radius 100m. */
   const applyParsedCoords = (parsed: ParsedGeo) => {
     setActiveGeofence(prev => {
       if (!prev) return null
-      // Radius default 100m hanya bila belum diisi admin (kosong)
+
       const radius = prev.radiusMeters.trim() ? prev.radiusMeters : '100'
       return { ...prev, latitude: String(parsed.latitude), longitude: String(parsed.longitude), radiusMeters: radius }
     })
     setCoordsFromLink(true)
     setManualCoords(false)
-    // Link yang ditempel DIBIARKAN terlihat agar admin bisa memverifikasi dari
-    // mana koordinatnya diambil (dan bisa di-copy ulang bila perlu).
+
     showToast('Koordinat terisi otomatis dari link Google Maps')
   }
 
-  /** Auto-extract saat paste / onChange — tanpa perlu menekan tombol. */
   const handleMapsLinkChanged = (value: string) => {
     setMapsLink(value)
     if (resolveTimer.current !== null) { window.clearTimeout(resolveTimer.current); resolveTimer.current = null }
     const raw = value.trim()
     if (!raw || !activeGeofence) return
 
-    // 1) URL penuh / teks "lat, lng" yang sudah memuat koordinat → isi seketika.
     if (!isShortMapsLink(raw)) {
       const quick = parseMapsUrl(raw)
       if (quick) { applyParsedCoords(quick); return }
     }
 
-    // 2) Short link (atau URL tanpa koordinat terbaca) → resolve ke server.
-    //    Ditunda 500 ms supaya mengetik/menempel tidak menembak banyak request.
     if (/^https?:\/\//i.test(raw)) {
       resolveTimer.current = window.setTimeout(() => {
         resolveTimer.current = null
@@ -226,7 +216,6 @@ export function RoutesTab({ showToast }: RoutesTabProps) {
     }
   }
 
-  /** Fallback manual (tombol) — tetap tersedia bila auto-extract gagal. */
   const handleMapsLinkGeofence = async () => {
     const raw = mapsLink.trim()
     if (!raw || !activeGeofence) return
@@ -247,7 +236,6 @@ export function RoutesTab({ showToast }: RoutesTabProps) {
       return
     }
 
-    // Validasi ketat: tolak kosong / null / placeholder teks template.
     const PLACEHOLDER_RE = /otomatis|link maps|latitude|longitude|^[-—]$/i
     const rawLat = latitude.trim()
     const rawLon = longitude.trim()
@@ -272,8 +260,6 @@ export function RoutesTab({ showToast }: RoutesTabProps) {
       return
     }
 
-    // Payload final — SEMUA numerik (float) & nama ter-trim; siap ke
-    // POST /api/geofences (create) atau PUT /api/geofences/:id (update).
     const data = {
       locationName: locationName.trim(),
       latitude: Number(lat),
@@ -283,14 +269,12 @@ export function RoutesTab({ showToast }: RoutesTabProps) {
     }
 
     if (id) {
-      // Update existing
       const ok = await updateGeofenceRule(id, data)
       if (!ok) {
         showToast('Gagal update titik geofence', 'error')
         return
       }
     } else {
-      // Create new
       const newId = await createRouteGeofencePoint(routeCode, data)
       if (!newId) {
         showToast('Gagal tambah titik geofence', 'error')
@@ -305,7 +289,6 @@ export function RoutesTab({ showToast }: RoutesTabProps) {
 
   const deleteGeofencePoint = async (point: GeofencePoint, routeCode: string) => {
     if (!point.id) {
-      // Local-only point
       setGeofencePoints(prev => prev.filter(p => p !== point))
       return
     }
@@ -326,7 +309,7 @@ export function RoutesTab({ showToast }: RoutesTabProps) {
 
   return (
     <div className="space-y-4">
-      {/* Header */}
+
       <div className="flex items-center justify-between">
         <div>
           <h3 className="font-black text-slate-900 text-lg">Master Rute</h3>
@@ -340,7 +323,6 @@ export function RoutesTab({ showToast }: RoutesTabProps) {
         </span>
       </div>
 
-      {/* Form */}
       <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm max-w-4xl">
         <h3 className="font-bold mb-4">{editRouteId ? 'Edit Rute' : 'Tambah Rute Baru'}</h3>
         <div className="grid grid-cols-6 gap-4 mb-4">
@@ -387,7 +369,6 @@ export function RoutesTab({ showToast }: RoutesTabProps) {
         </div>
       </div>
 
-      {/* Tabel */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <table className="w-full text-sm">
           <thead className="bg-slate-50 text-slate-400 text-[10px] uppercase">
@@ -426,11 +407,10 @@ export function RoutesTab({ showToast }: RoutesTabProps) {
         </table>
       </div>
 
-      {/* ─── Geofence Points Panel ─────────────────────────────────────────── */}
       {showGeofencePanel && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
-            {/* Header */}
+
             <div className="flex items-center justify-between p-6 border-b border-slate-200">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center">
@@ -451,9 +431,8 @@ export function RoutesTab({ showToast }: RoutesTabProps) {
               </button>
             </div>
 
-            {/* Content */}
             <div className="flex-1 overflow-y-auto p-6 space-y-4">
-              {/* Existing Points */}
+
               {geofencePoints.length === 0 && !activeGeofence && (
                 <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800 text-center">
                   Belum ada titik geofence untuk rute ini.<br />
@@ -461,7 +440,6 @@ export function RoutesTab({ showToast }: RoutesTabProps) {
                 </div>
               )}
 
-              {/* Point List */}
               {geofencePoints.map((point, idx) => (
                 <div key={point.id || idx} className="bg-slate-50 rounded-xl p-4 border border-slate-200">
                   <div className="flex items-start justify-between">
@@ -510,14 +488,12 @@ export function RoutesTab({ showToast }: RoutesTabProps) {
                 </div>
               ))}
 
-              {/* Add/Edit Form */}
               {activeGeofence !== null && (
                 <div className="bg-blue-50 rounded-xl p-4 border border-blue-200 space-y-4">
                   <h4 className="font-bold text-blue-900 text-sm">
                     {activeGeofence.id ? 'Edit Titik' : 'Tambah Titik Baru'}
                   </h4>
 
-                  {/* Google Maps URL Input */}
                   <div>
                     <label className="text-xs font-semibold text-slate-600 block mb-1">
                       Paste Link Google Maps <span className="font-normal text-slate-400">(koordinat otomatis)</span>
@@ -552,7 +528,6 @@ export function RoutesTab({ showToast }: RoutesTabProps) {
                     </p>
                   </div>
 
-                  {/* Lat/Lng Fields — otomatis dari link, read-only */}
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="text-xs font-semibold text-slate-600 block mb-1 flex items-center gap-2">
@@ -594,7 +569,6 @@ export function RoutesTab({ showToast }: RoutesTabProps) {
                     </div>
                   </div>
 
-                  {/* Opsi koreksi manual — admin tetap bisa memperbaiki angka bila perlu */}
                   <label className="flex items-center gap-2 text-[11px] text-slate-500 cursor-pointer select-none">
                     <input
                       type="checkbox"
@@ -605,7 +579,6 @@ export function RoutesTab({ showToast }: RoutesTabProps) {
                     Isi koordinat manual (koreksi bila hasil otomatis kurang tepat)
                   </label>
 
-                  {/* Location Name */}
                   <div>
                     <label className="text-xs font-semibold text-slate-600 block mb-1">Nama Lokasi</label>
                     <input
@@ -616,7 +589,6 @@ export function RoutesTab({ showToast }: RoutesTabProps) {
                     />
                   </div>
 
-                  {/* Radius — default 100m otomatis setelah link diparse */}
                   <div>
                     <label className="text-xs font-semibold text-slate-600 block mb-1">Radius (meter) <span className="font-normal text-slate-400">— default 100 meter</span></label>
                     <input
@@ -634,7 +606,6 @@ export function RoutesTab({ showToast }: RoutesTabProps) {
                     </p>
                   </div>
 
-                  {/* Description */}
                   <div>
                     <label className="text-xs font-semibold text-slate-600 block mb-1">Keterangan <span className="font-normal text-slate-400">(opsional)</span></label>
                     <input
@@ -645,7 +616,6 @@ export function RoutesTab({ showToast }: RoutesTabProps) {
                     />
                   </div>
 
-                  {/* Preview */}
                   {activeGeofence.latitude && activeGeofence.longitude && !isNaN(parseFloat(activeGeofence.latitude)) && (
                     <div>
                       <iframe
@@ -657,7 +627,6 @@ export function RoutesTab({ showToast }: RoutesTabProps) {
                     </div>
                   )}
 
-                  {/* Actions */}
                   <div className="flex gap-2 pt-2">
                     <button
                       onClick={cancelGeofenceEdit}
@@ -676,7 +645,6 @@ export function RoutesTab({ showToast }: RoutesTabProps) {
               )}
             </div>
 
-            {/* Footer */}
             <div className="p-4 border-t border-slate-200">
               {!activeGeofence && (
                 <button

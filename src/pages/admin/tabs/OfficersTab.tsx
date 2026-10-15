@@ -5,11 +5,16 @@ import { fetchRoutes, fetchDermagas } from '../../../services/dermagas'
 import { api } from '../../../services/api'
 import type { Officer, BackendOfficerRow, RouteRow, RouteDermaga } from '../components/types'
 
+
+
+
 interface OfficersTabProps {
-  officers: Officer[] 
+  officers: Officer[]
   onSaveOfficers: (o: Officer[]) => void
   showToast: (msg: string, type?: 'success' | 'error') => void
 }
+
+
 
 const HIDDEN_REGION_CODES = ['SBDZ', 'SJRE']
 
@@ -24,7 +29,7 @@ function mergeBackendOfficers(rows: BackendOfficerRow[], prev: Officer[]): Offic
       ? b.dermagas
       : old?.dermagaAccess && old.dermagaAccess.length > 0
         ? old.dermagaAccess
-        : [{ id: '', name: 'Dermaga 1', code: 'D1' }] 
+        : [{ id: '', name: 'Dermaga 1', code: 'D1' }]
     return {
       id: String(b.id),
       name: b.name,
@@ -43,7 +48,8 @@ function mergeBackendOfficers(rows: BackendOfficerRow[], prev: Officer[]): Offic
   })
 }
 
-// Settings dropdown component
+
+
 function ActionMenu({ onEdit, onToggle, onDelete, isActive }: { onEdit: () => void; onToggle: () => void; onDelete: () => void; isActive: boolean }) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -82,10 +88,9 @@ function ActionMenu({ onEdit, onToggle, onDelete, isActive }: { onEdit: () => vo
   )
 }
 
+
+
 export function OfficersTab({ officers, onSaveOfficers, showToast }: OfficersTabProps) {
-
-  
-
   const [localOfficers, setLocalOfficers] = useState<Officer[]>([])
   const [regions, setRegions] = useState<Region[]>([])
   const [routeRows, setRouteRows] = useState<RouteRow[]>([])
@@ -99,8 +104,6 @@ export function OfficersTab({ officers, onSaveOfficers, showToast }: OfficersTab
   const [editRegions, setEditRegions] = useState<string[]>([])
   const [editDermagaIds, setEditDermagaIds] = useState<string[]>([])
 
-
-  
   useEffect(() => {
     let alive = true
     setLoading(true)
@@ -125,8 +128,6 @@ export function OfficersTab({ officers, onSaveOfficers, showToast }: OfficersTab
     return () => { alive = false }
   }, [])
 
-
-
   const regionCodes = regions.map(r => r.code).filter(c => !HIDDEN_REGION_CODES.includes(c))
   const officerRegionCodes = (o: Officer) =>
     (o.regions && o.regions.length > 0 ? o.regions : [o.region])
@@ -140,14 +141,12 @@ export function OfficersTab({ officers, onSaveOfficers, showToast }: OfficersTab
     ...(localOfficers.some(o => !officerRegionCodes(o).some(c => regionCodes.includes(c))) ? ['LAINNYA'] : []),
   ]
 
-
   const regionCodeOfDermaga = (d: RouteDermaga) => d.region_code || regions.find(r => r.id === d.region_id)?.code || ''
   const dermagaOptionsFor = (codes: string[]) => routeDermagas.filter(d => codes.includes(regionCodeOfDermaga(d)))
   const routesForOfficer = (o: Officer) => {
     const ids = new Set((o.dermagaAccess ?? []).map(d => d.id))
     return ids.size > 0 ? routeRows.filter(r => ids.has(r.dermaga_id)) : []
   }
-
 
   const toggleId = (list: string[], id: string) => list.includes(id) ? list.filter(x => x !== id) : [...list, id]
   const findBackendOfficer = (o: { id?: string; name: string }) =>
@@ -161,8 +160,6 @@ export function OfficersTab({ officers, onSaveOfficers, showToast }: OfficersTab
       onSaveOfficers(merged)
     }
   }
-
-
 
   const handleAddOff = async () => {
     if (!offForm.name || !offForm.pin) return showToast('Lengkapi form!', 'error')
@@ -198,8 +195,6 @@ export function OfficersTab({ officers, onSaveOfficers, showToast }: OfficersTab
     showToast('Petugas diupdate')
   }
 
-
-
   const handleDelOff = async (localIdx: number) => {
     if (!confirm('Hapus?')) return
     const officer = localOfficers[localIdx]
@@ -211,8 +206,6 @@ export function OfficersTab({ officers, onSaveOfficers, showToast }: OfficersTab
     }
     showToast('Petugas dihapus')
   }
-
-
 
   const toggleOffStatus = async (localIdx: number) => {
     const officer = localOfficers[localIdx]
@@ -246,9 +239,6 @@ export function OfficersTab({ officers, onSaveOfficers, showToast }: OfficersTab
         </button>
       </div>
 
-
-
-
       {addOff && (
         <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm max-w-lg">
           <h3 className="font-bold mb-4">Tambah Petugas</h3>
@@ -263,8 +253,6 @@ export function OfficersTab({ officers, onSaveOfficers, showToast }: OfficersTab
               </select></div>
           </div>
 
-
-          
           <div className="mb-4">
             <label className="text-[11px] text-slate-500 block mb-1.5">Dermaga</label>
             {dermagaOptionsFor([offForm.region]).length === 0 ? (
@@ -281,8 +269,6 @@ export function OfficersTab({ officers, onSaveOfficers, showToast }: OfficersTab
               </div>
             )}''
 
-
-
           </div>
           <div className="mb-4"><label className="text-[11px] text-slate-500 block mb-1">PIN</label>
             <input type="password" maxLength={6} value={offForm.pin} onChange={e => setOffForm({...offForm, pin: e.target.value})}
@@ -293,9 +279,6 @@ export function OfficersTab({ officers, onSaveOfficers, showToast }: OfficersTab
           </div>
         </div>
       )}
-
-
-
 
       {editOffIdx !== null && editOff && (
         <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm max-w-lg">
@@ -313,10 +296,6 @@ export function OfficersTab({ officers, onSaveOfficers, showToast }: OfficersTab
                     {c}
                   </label>
                 ))}
-
-
-
-
 
               </div></div>
           </div>
@@ -347,18 +326,12 @@ export function OfficersTab({ officers, onSaveOfficers, showToast }: OfficersTab
         </div>
       )}
 
-
-
-
       {localOfficers.length === 0 && !loading && (
         <div className="bg-white rounded-2xl p-8 text-center border border-slate-200 shadow-sm">
           <p className="text-slate-500 font-semibold mb-1">Belum ada petugas</p>
           <p className="text-slate-400 text-sm">Klik "Tambah Petugas" untuk menambahkan petugas pertama</p>
         </div>
       )}
-
-
-
 
       {officerGroups.map(region => {
         const groupOfficers = localOfficers.filter(o => inRegionGroup(o, region))
@@ -389,7 +362,6 @@ export function OfficersTab({ officers, onSaveOfficers, showToast }: OfficersTab
                           </span>
                         }
 
-
                       </td>
                       <td className="p-4 text-[12px] text-slate-600">
                         {routesForOfficer(o).length === 0
@@ -402,9 +374,6 @@ export function OfficersTab({ officers, onSaveOfficers, showToast }: OfficersTab
                             ))}
                           </span>
                         }
-
-
-
 
                       </td>
                       <td className="p-4">
@@ -420,9 +389,6 @@ export function OfficersTab({ officers, onSaveOfficers, showToast }: OfficersTab
                       </td>
                     </tr>
                   )
-
-
-
                 })}
               </tbody>
             </table>

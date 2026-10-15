@@ -4,9 +4,12 @@ const { randomUUID } = require('crypto');
 const { db } = require('../db');
 const { authenticate, requireAdmin } = require('../middleware/auth');
 
-// Kode rute dipakai frontend sebagai "ASAL-TUJUAN" (cth. SJRE-SBDZ).
+
+
 const csv = (v) => (Array.isArray(v) ? v.join(',') : String(v ?? ''));
 const splitCsv = (v) => String(v ?? '').split(',').map(s => s.trim()).filter(Boolean);
+
+
 
 function toRule(row) {
   return {
@@ -21,20 +24,22 @@ function toRule(row) {
   };
 }
 
+
+
 function validCoords(latitude, longitude) {
   return Number.isFinite(latitude) && Number.isFinite(longitude)
     && Math.abs(latitude) <= 90 && Math.abs(longitude) <= 180;
 }
 
-// GET /api/geofences — daftar semua titik geofence (admin)
+
+
 router.get('/', authenticate, requireAdmin, (_req, res) => {
   const rows = db.prepare(`SELECT * FROM geofences ORDER BY location_name ASC`).all();
   res.json(rows.map(toRule));
 });
 
-// GET /api/geofences/resolve-link — ikuti redirect short-link Google Maps
-// (harus di belakang authenticate: tanpa token responsenya 401 dan auto-isi
-// koordinat di dashboard selalu gagal).
+
+
 router.get('/resolve-link', authenticate, async (req, res) => {
   const url = String(req.query.url || '').trim();
   if (!/^https?:\/\//i.test(url)) {
@@ -48,7 +53,8 @@ router.get('/resolve-link', authenticate, async (req, res) => {
   }
 });
 
-// POST /api/geofences — tambah titik (admin)
+
+
 router.post('/', authenticate, requireAdmin, (req, res) => {
   const { locationName, latitude, longitude, radiusMeters, allowedRouteCodes, allowedDirections, description } = req.body || {};
   const lat = Number(latitude);
@@ -76,7 +82,8 @@ router.post('/', authenticate, requireAdmin, (req, res) => {
   res.json({ id });
 });
 
-// PUT /api/geofences/:id — ubah titik (admin)
+
+
 router.put('/:id', authenticate, requireAdmin, (req, res) => {
   const row = db.prepare(`SELECT * FROM geofences WHERE id = ?`).get(String(req.params.id));
   if (!row) return res.status(404).json({ error: 'Titik geofence tidak ditemukan' });
@@ -112,11 +119,14 @@ router.put('/:id', authenticate, requireAdmin, (req, res) => {
   res.json({ ok: true });
 });
 
-// DELETE /api/geofences/:id (admin)
+
+
 router.delete('/:id', authenticate, requireAdmin, (req, res) => {
   const info = db.prepare(`DELETE FROM geofences WHERE id = ?`).run(String(req.params.id));
   if (info.changes === 0) return res.status(404).json({ error: 'Titik geofence tidak ditemukan' });
   res.json({ ok: true });
 });
+
+
 
 module.exports = router;

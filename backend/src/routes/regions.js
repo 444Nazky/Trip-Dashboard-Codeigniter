@@ -3,7 +3,8 @@ const router = express.Router();
 const { db } = require('../db');
 const { authenticate, requireAdmin } = require('../middleware/auth');
 
-// Get all regions
+
+
 router.get('/', (req, res) => {
   try {
     const regions = db.prepare(`SELECT * FROM regions ORDER BY name`).all();
@@ -13,7 +14,8 @@ router.get('/', (req, res) => {
   }
 });
 
-// Create region
+
+
 router.post('/', authenticate, requireAdmin, (req, res) => {
   try {
     const { name, code } = req.body;
@@ -26,5 +28,7 @@ const { randomUUID } = require('crypto');
     res.status(500).json({ error: 'Failed to create region' });
   }
 });
+
+
 
 module.exports = router;

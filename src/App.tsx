@@ -4,7 +4,8 @@ import LoginPage from './pages/LoginPage'
 import { AUTH_EVENT, logout } from './services/auth'
 import { ensureAdminSession } from './services/auth'
 
-// ── Shell: guard utama admin build. ──────────────────────────────────────────
+
+
 function Shell() {
   const [status, setStatus] = useState<'loading' | 'admin' | 'login'>('loading')
 
@@ -20,7 +21,6 @@ function Shell() {
 
   useEffect(() => { validate() }, [validate])
 
-  // Setelah LoginPage menyimpan kredensial baru, validasi ulang.
   useEffect(() => {
     function onLogin() { validate() }
     window.addEventListener(AUTH_EVENT, onLogin)
@@ -41,6 +41,8 @@ function Shell() {
 
   return <LoginPage onLogin={validate} />
 }
+
+
 
 export default function App() {
   return <Shell />

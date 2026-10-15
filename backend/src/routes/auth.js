@@ -5,17 +5,12 @@ const jwt = require('jsonwebtoken');
 const { db } = require('../db');
 const { JWT_SECRET } = require('../middleware/auth');
 
-// Admin login (username/password) — issues a JWT with role: 'admin'
-//
-// Deteksi kredensial khusus admin, dua lapis:
-//   1. Hasil "Ganti Password" di dashboard (tabel admin_credentials, bcrypt)
-//      — diprioritaskan; setelah password diganti, password lama SUDAH MATI.
-//   2. Fallback default admin/admin123 (atau ADMIN_USERNAME/ADMIN_PASSWORD env)
+
+
 router.post('/admin-login', (req, res) => {
   try {
     const { username, password } = req.body || {};
     const adminUser = process.env.ADMIN_USERNAME || 'admin';
-    const adminPass = process.env.ADMIN_PASSWORD || 'admin123';
 
     let row = null;
     try { row = adminGetCredentials(); } catch (_) { row = null; }
@@ -24,15 +19,16 @@ router.post('/admin-login', (req, res) => {
     let effectiveUser = adminUser;
 
     if (row && row.password) {
-      // Password sudah pernah diganti → HANYA password baru yang berlaku.
       effectiveUser = String(row.username || adminUser);
       if (String(username ?? '') === effectiveUser) {
         try { valid = bcrypt.compareSync(String(password ?? ''), row.password); }
         catch (_) { valid = false; }
       }
     } else {
-      // Belum pernah diganti → kredensial default/env.
-      valid = username === adminUser && password === adminPass;
+      if (!process.env.ADMIN_PASSWORD) {
+        return res.status(503).json({ error: 'Admin credentials not configured' });
+      }
+      valid = username === adminUser && password === process.env.ADMIN_PASSWORD;
     }
 
     if (!valid) {
@@ -48,7 +44,7 @@ router.post('/admin-login', (req, res) => {
     res.json({ token, admin: { username: effectiveUser, role: 'admin' } });
   } catch (error) {
     console.error('Admin login error:', error);
-    // Log more details for debugging
+
     if (error.code === 'ERR_JWT_SECRET_NOT_IN_PEM') {
       console.error('JWT_SECRET appears to be invalid. Check your environment variables.');
     }
@@ -56,10 +52,12 @@ router.post('/admin-login', (req, res) => {
   }
 });
 
-// ── Admin credentials store (SQLite, tidak perlu migrasi manual) ──────────────
-// Menyimpan hashed password admin di SQLite, bukan environment variable.
-// Ini memungkinkan perubahan password tanpa restart server.
+
+
 let adminTableReady = false;
+
+
+
 function ensureAdminCredentialsTable() {
   if (adminTableReady) return;
   db.prepare(`
@@ -72,10 +70,14 @@ function ensureAdminCredentialsTable() {
   adminTableReady = true;
 }
 
+
+
 function adminGetCredentials() {
   ensureAdminCredentialsTable();
   return db.prepare(`SELECT id, username, password FROM admin_credentials LIMIT 1`).get() ?? null;
 }
+
+
 
 function adminSetCredentials(username, passwordHash) {
   ensureAdminCredentialsTable();
@@ -84,11 +86,9 @@ function adminSetCredentials(username, passwordHash) {
     .run(username, passwordHash);
 }
 
-// ── POST /auth/change-admin-password ────────────────────────────────────────────
-// Body: { currentPassword, newPassword }
+
+
 router.post(`/change-admin-password`, async (req, res) => {
-  // Error di handler async TIDAK ditangkap Express 4 → unhandled rejection →
-  // proses Node mati. Semua langkah dibungkus try agar balas 500, bukan crash.
   try {
     const { currentPassword, newPassword } = req.body ?? {}
 
@@ -102,12 +102,11 @@ router.post(`/change-admin-password`, async (req, res) => {
     const row = adminGetCredentials()
     const storedHash = row?.password ?? null
 
-    // Kalau tidak ada di SQLite, fallback ke env / hardcoded default (admin/admin123)
     let valid = false
     if (storedHash) {
       try { valid = bcrypt.compareSync(currentPassword, storedHash) } catch (_) { valid = false }
-    } else {
-      valid = currentPassword === (process.env.ADMIN_PASSWORD ?? `admin123`)
+    } else if (process.env.ADMIN_PASSWORD) {
+      valid = currentPassword === process.env.ADMIN_PASSWORD
     }
 
     if (!valid) {
@@ -124,5 +123,7 @@ router.post(`/change-admin-password`, async (req, res) => {
     res.status(500).json({ error: `Gagal memproses permintaan` })
   }
 })
+
+
 
 module.exports = router;

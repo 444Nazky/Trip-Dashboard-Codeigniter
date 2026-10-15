@@ -7,7 +7,8 @@ import { PhotoViewer, resolvePhotoUrl } from '../components/PhotoViewer'
 import { fetchGeofenceRules, type GeofenceRule } from '../../../services/geofences'
 import { locationDistanceText } from '../../../services/locationDistance'
 
-/** Caption foto — metadata pakai "jarak dari titik" bila geofence tersedia. */
+
+
 function vehiclePhotoCaption(
   trip: ReportTrip,
   vehicle: ReportTrip['vehicles'][number],
@@ -15,7 +16,7 @@ function vehiclePhotoCaption(
 ): string {
   const metadata = [
     vehicle.foto_captured_at ? formatReportDateTime(vehicle.foto_captured_at).full : '',
-    // "80m dari SBDZ" bila titik geofence ada; fallback koordinat bila belum
+
     locationDistanceText(vehicle, geoRules)
       || (typeof vehicle.latitude === 'number' && typeof vehicle.longitude === 'number'
         ? `${vehicle.latitude.toFixed(5)}, ${vehicle.longitude.toFixed(5)}` : ''),
@@ -32,6 +33,8 @@ interface ReportsTabProps {
   baseUrl?: string
 }
 
+
+
 export function ReportsTab({ onServerTripsChange, showToast, revealed, onToggleReveal, baseUrl = '' }: ReportsTabProps) {
   const [reportTrips, setReportTrips] = useState<ReportTrip[]>([])
   const [reportState, setReportState] = useState<'idle' | 'loading' | 'ready' | 'offline'>('idle')
@@ -39,7 +42,7 @@ export function ReportsTab({ onServerTripsChange, showToast, revealed, onToggleR
   const [reportFilters, setReportFilters] = useState<ReportFilters>({})
   const [filterOptions, setFilterOptions] = useState<{ golongan: string[]; vehicleTypes: string[] }>({ golongan: [], vehicleTypes: [] })
   const [viewingPhotos, setViewingPhotos] = useState<{ id: string; url: string; caption?: string }[] | null>(null)
-  /** Titik geofence Master Rute — untuk teks "<jarak>m dari <titik>" di caption foto. */
+
   const [geoRules, setGeoRules] = useState<GeofenceRule[]>([])
 
   const loadReports = async (filters?: ReportFilters) => {
@@ -58,7 +61,7 @@ export function ReportsTab({ onServerTripsChange, showToast, revealed, onToggleR
         if (trips) onServerTripsChange(trips)
       })
       void loadReports()
-      // Muat titik geofence sekali — untuk "<jarak>m dari <titik>" di caption foto
+
       fetchGeofenceRules().then(rules => { if (rules) setGeoRules(rules) }).catch(() => null)
     }
   }, [reportState])
@@ -97,7 +100,6 @@ export function ReportsTab({ onServerTripsChange, showToast, revealed, onToggleR
     const header = ['No Trip', 'Tanggal', 'Jam (WIB)', 'Tempat / Wilayah', 'Rute Asal', 'Rute Tujuan', 'Rute', 'Petugas', 'Status Muatan', 'Kategori', 'Jumlah Unit', 'Total Tarif (Rp)']
     const rentang = reportRentang(reportFilters)
 
-    // Sheet 1 — ringkasan trip
     const tripRows: (string | number | null)[][] = [
       ['Laporan Trip Angkutan'],
       ['Dicetak', stamped.full],
@@ -116,7 +118,6 @@ export function ReportsTab({ onServerTripsChange, showToast, revealed, onToggleR
           t.vehicle_count || 0, t.trip_revenue || 0]
       }),
     ]
-
 
     const vehRows: (string | number | null)[][] = [
       ['Detail Kendaraan per Trip'],
@@ -141,7 +142,6 @@ export function ReportsTab({ onServerTripsChange, showToast, revealed, onToggleR
   const golonganOptions = filterOptions.golongan.length > 0 ? filterOptions.golongan : []
   const jenisOptions = filterOptions.vehicleTypes.length > 0 ? filterOptions.vehicleTypes : []
 
-  // Analitik ringkas
   const totalTrip = reportTrips.length
   const totalUnit = reportTrips.reduce((s, t) => s + (t.vehicle_count || 0), 0)
   const totalRevenue = reportTrips.reduce((s, t) => s + (t.trip_revenue || 0), 0)
@@ -149,7 +149,6 @@ export function ReportsTab({ onServerTripsChange, showToast, revealed, onToggleR
   const kosongCount = totalTrip - muatanCount
   const muatanPct = totalTrip ? (muatanCount / totalTrip) * 100 : 0
 
-  // Grafik 1 — trip per hari (maksimal 14 hari dalam rentang terpilih)
   const reportDaily = Array.from(
     reportTrips.reduce((m, t) => {
       const k = dayKeyWib(t.created_at)
@@ -179,9 +178,6 @@ export function ReportsTab({ onServerTripsChange, showToast, revealed, onToggleR
             className="border border-slate-200 text-slate-700 px-3.5 py-2 rounded-lg font-semibold text-sm hover:bg-slate-50 disabled:opacity-50">
             Refresh
           </button>
-          
-
-
 
           <button onClick={() => { window.location.hash = '#/sheet' }} disabled={reportState !== 'ready'}
             title="Buka spreadsheet live yang tersinkron langsung dari database"
@@ -201,7 +197,6 @@ export function ReportsTab({ onServerTripsChange, showToast, revealed, onToggleR
         </div>
       </div>
 
-      {/* Filter */}
       <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex flex-wrap items-end gap-4">
         <div><label className="text-[11px] font-bold text-slate-500 block mb-1.5">Dari</label>
           <input type="date" value={reportFilters.startDate || ''} onChange={e => applyReportFilter({ startDate: e.target.value || undefined })}
@@ -233,7 +228,6 @@ export function ReportsTab({ onServerTripsChange, showToast, revealed, onToggleR
         <span className="ml-auto text-[12px] text-slate-400 font-semibold">{totalTrip} trip</span>
       </div>
 
-      {/* Ringkasan */}
       {reportState === 'ready' && (
         <div className="grid grid-cols-2 xl:grid-cols-4 gap-4">
           <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm text-center">
@@ -255,10 +249,9 @@ export function ReportsTab({ onServerTripsChange, showToast, revealed, onToggleR
         </div>
       )}
 
-      {/* Grafik analitik — di atas tabel agar terasa sebagai laporan utuh */}
       {reportState === 'ready' && totalTrip > 0 && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          {/* Trip per hari */}
+
           <div className="lg:col-span-2 bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
             <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
               <div>
@@ -282,7 +275,6 @@ export function ReportsTab({ onServerTripsChange, showToast, revealed, onToggleR
             </div>
           </div>
 
-          {/* Komposisi muatan */}
           <div className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
             <h4 className="font-bold text-slate-800 text-sm">Komposisi Muatan</h4>
             <p className="text-[11px] text-slate-400 mb-4">trip bermuatan vs kosong</p>
@@ -312,7 +304,6 @@ export function ReportsTab({ onServerTripsChange, showToast, revealed, onToggleR
         </div>
       )}
 
-      {/* Modal Foto */}
       {viewingPhotos && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setViewingPhotos(null)}>
           <div onClick={e => e.stopPropagation()} className="max-w-4xl w-full">
@@ -321,7 +312,6 @@ export function ReportsTab({ onServerTripsChange, showToast, revealed, onToggleR
         </div>
       )}
 
-      {/* Tabel */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
         <table className="w-full border-collapse text-[13px]">
           <thead>

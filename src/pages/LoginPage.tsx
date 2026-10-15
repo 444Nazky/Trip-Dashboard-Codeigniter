@@ -1,17 +1,15 @@
-/**
- * Gerbang login admin di dashboard (build admin).
- *
- * Muncul HANYA ketika backend menolak sesi (token kedaluwarsa / password
- * diganti). Form menyimpan token sesi (api.ts) — TANPA menyimpan password
- * di browser dan tanpa tombol kredensial bawaan.
- */
 import { useState } from 'react'
 import { Lock, Loader2 } from 'lucide-react'
 import { adminLogin, AUTH_EVENT } from '../services/auth'
 
+
+
+
 interface Props {
   onLogin?: () => void
 }
+
+
 
 export default function LoginPage({ onLogin }: Props) {
   const [username, setUsername] = useState('admin')
@@ -33,7 +31,7 @@ export default function LoginPage({ onLogin }: Props) {
       setErr(session.authDenied ? 'Username atau password salah.' : 'Server tidak merespon.')
       return
     }
-    // Sinkronisasi App.tsx Shell — Shell re-validasi token via ensureAdminSession.
+
     window.dispatchEvent(new CustomEvent(AUTH_EVENT))
     setTimeout(() => onLogin?.(), 150)
   }

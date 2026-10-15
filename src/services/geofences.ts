@@ -1,5 +1,6 @@
-// ─── Geofence Config Service (Admin Dashboard) ──────────────────────────────────
 import { api } from './api'
+
+
 
 export interface GeofenceRule {
   id: string
@@ -13,6 +14,7 @@ export interface GeofenceRule {
 }
 
 
+
 export async function fetchGeofenceRules(): Promise<GeofenceRule[] | null> {
   const rules = await api.getOk<GeofenceRule[]>('/geofences')
   if (!rules) return null
@@ -22,6 +24,8 @@ export async function fetchGeofenceRules(): Promise<GeofenceRule[] | null> {
     allowedDirections: Array.isArray(r.allowedDirections) ? r.allowedDirections : String(r.allowedDirections ?? '').split(',').filter(Boolean),
   }))
 }
+
+
 
 export async function createGeofenceRule(
   data: Omit<GeofenceRule, 'id'>
@@ -38,6 +42,8 @@ export async function createGeofenceRule(
   return res.data?.id ?? null
 }
 
+
+
 export async function updateGeofenceRule(
   id: string,
   data: Partial<GeofenceRule>
@@ -46,13 +52,14 @@ export async function updateGeofenceRule(
   return res.ok
 }
 
+
+
 export async function deleteGeofenceRule(id: string): Promise<boolean> {
   const res = await api.delete(`/geofences/${id}`)
   return res.ok
 }
 
-// ─── Route-linked Geofence Points ────────────────────────────────────────────
-// Functions for managing geofence points associated with a specific route.
+
 
 export interface RouteGeofencePoint {
   id: string
@@ -63,19 +70,16 @@ export interface RouteGeofencePoint {
   description?: string
 }
 
-/**
- * Fetch geofence points that apply to a specific route code.
- * Returns geofences where allowed_route_codes contains the route code.
- */
+
+
 export async function fetchGeofencePointsForRoute(routeCode: string): Promise<RouteGeofencePoint[]> {
   const all = await fetchGeofenceRules()
   if (!all) return []
   return all.filter(g => g.allowedRouteCodes.includes(routeCode))
 }
 
-/**
- * Create a geofence point linked to a route.
- */
+
+
 export async function createRouteGeofencePoint(
   routeCode: string,
   data: Omit<GeofenceRule, 'id' | 'allowedRouteCodes' | 'allowedDirections'>
@@ -86,4 +90,3 @@ export async function createRouteGeofencePoint(
     allowedDirections: [],
   })
 }
-

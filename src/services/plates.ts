@@ -1,9 +1,10 @@
-// ─── Plates API Service ───────────────────────────────────────────────────────
-// Registrasi & pengecekan nomor plat (internal / lokal / eksternal).
-
 import { api } from './api'
 
+
+
 export type PlateStatus = 'internal' | 'lokal' | 'eksternal'
+
+
 
 export interface PlateRecord {
   id: string
@@ -17,12 +18,14 @@ export interface PlateRecord {
   created_at: string
 }
 
-/** Daftar plat terdaftar (admin). null = server tidak terjangkau. */
+
+
 export async function fetchPlates(): Promise<PlateRecord[] | null> {
   return api.getOk<PlateRecord[]>('/plates')
 }
 
-/** Registrasi plat baru (admin). Return id baru atau null. */
+
+
 export async function createPlate(input: {
   plate: string
   owner?: string
@@ -34,7 +37,8 @@ export async function createPlate(input: {
   return null
 }
 
-/** Edit plat (admin). */
+
+
 export async function updatePlate(
   id: string,
   input: { plate?: string; owner?: string; originRegionId?: string | null; status?: PlateStatus },
@@ -43,7 +47,8 @@ export async function updatePlate(
   return res.ok
 }
 
-/** Hapus plat (admin). */
+
+
 export async function deletePlate(id: string): Promise<boolean> {
   const res = await api.delete(`/plates/${id}`)
   return res.ok

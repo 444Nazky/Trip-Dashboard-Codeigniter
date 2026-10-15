@@ -1,7 +1,6 @@
-// ─── Trips API Service ─────────────────────────────────────────────────────────
-// Fetch trips from backend for admin dashboard
-
 import { api } from './api'
+
+
 
 export interface BackendTrip {
   id: string
@@ -16,24 +15,26 @@ export interface BackendTrip {
   is_synced: number
   created_at: string
   vehicle_count: number
-  /** Joined from officers table (present on GET /trips) */
+
   officer_name?: string | null
   region_code?: string | null
 }
+
+
 
 export async function fetchTrips(): Promise<BackendTrip[] | null> {
   return api.getOk<BackendTrip[]>('/trips')
 }
 
-// ─── Admin report: trips with full vehicle detail ─────────────────────────────
+
 
 export interface ReportVehicle {
   id: string
   no_polisi: string
   vehicle_type: string
-  /** Kategori: 'Internal' | 'Eksternal' | 'Eksternal Bebas' (baris lama bisa berisi golongan romawi) */
+
   golongan: string
-  /** Golongan master tarif (I..V) bila tersedia */
+
   master_golongan?: string | null
   has_load: number
   tariff_amount: number
@@ -41,9 +42,11 @@ export interface ReportVehicle {
   foto_captured_at?: string | null
   latitude?: number | null
   longitude?: number | null
-  /** Alias for foto_path - used in some API responses */
+
   photo_url?: string | null
 }
+
+
 
 export interface ReportTrip {
   id: string
@@ -62,7 +65,7 @@ export interface ReportTrip {
   officer_name?: string | null
   region_name?: string | null
   region_code?: string | null
-  /** Nama wilayah asal/tujuan (join regions on code) — untuk detail tempat */
+
   route_from_name?: string | null
   route_to_name?: string | null
   vehicle_count: number
@@ -70,12 +73,8 @@ export interface ReportTrip {
   vehicles: ReportVehicle[]
 }
 
-/**
- * Label urutan dokumentasi PER JENIS kendaraan pada satu trip — contoh:
- *   [Truk Besar, Truk Besar, Mobil, Motor] → "Truk 1", "Truk 2", "Mobil 1", "Motor 1"
- * Dipakai di caption foto & kolom Unit supaya foto truk 1 tidak tertukar
- * dengan truk 2 di output dokumentasi admin.
- */
+
+
 export function vehicleUnitLabel(
   vehicles: ReportVehicle[],
   vehicle: ReportVehicle | undefined,
@@ -91,17 +90,19 @@ export function vehicleUnitLabel(
   return `${type.replace(/^Truck/i, 'Truk')} ${n}`
 }
 
-/** Filter laporan (golongan & jenis kendaraan dari master tarif). */
+
+
 export interface ReportFilters {
   golongan?: string
   vehicleType?: string
   route?: string
   status?: string
-  /** Rentang tanggal laporan (YYYY-MM-DD). Backend menerapkan filter hanya
-   *  bila startDate & endDate sama-sama ada, jadi keduanya dikirim berpasangan. */
+
   startDate?: string
   endDate?: string
 }
+
+
 
 function toQuery(f?: ReportFilters): string {
   if (!f) return ''
@@ -116,27 +117,34 @@ function toQuery(f?: ReportFilters): string {
   return qs ? `?${qs}` : ''
 }
 
-/** Admin-only (GET /reports/trips). Returns null on failure. */
+
+
 export async function fetchTripReports(filters?: ReportFilters): Promise<ReportTrip[] | null> {
   return api.getOk<ReportTrip[]>(`/reports/trips${toQuery(filters)}`)
 }
 
-/** Opsi filter laporan (golongan + jenis kendaraan) dari master tarif. */
+
+
 export interface ReportFilterOptions {
   golongan: string[]
   vehicleTypes: string[]
 }
 
+
+
 export async function fetchReportFilters(): Promise<ReportFilterOptions | null> {
   return api.getOk<ReportFilterOptions>('/reports/trips/filters')
 }
 
-/** Ringkasan angka (trip, unit, pendapatan) untuk kartu metrik dashboard. */
+
+
 export interface ReportSummary {
   totalTrips: number
   totalVehicles: number
   totalRevenue: number
 }
+
+
 
 export async function fetchReportSummary(
   startDate?: string,
@@ -149,7 +157,8 @@ export async function fetchReportSummary(
   return api.getOk<ReportSummary>(`/reports/summary${qs ? `?${qs}` : ''}`)
 }
 
-/** Kunci hari (YYYY-MM-DD) dalam zona waktu WIB — dipakai grafik & metrik harian. */
+
+
 export function dayKeyWib(raw: string | null | undefined): string {
   if (!raw) return '-'
   const iso = /Z|[+-]\d{2}:\d{2}$/.test(raw) ? raw : `${raw.replace(' ', 'T')}Z`
@@ -158,16 +167,14 @@ export function dayKeyWib(raw: string | null | undefined): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Jakarta' }).format(d)
 }
 
-/**
- * Format timestamp UTC dari SQLite (`YYYY-MM-DD HH:MM:SS`) ke waktu Indonesia
- * Barat (Asia/Jakarta, UTC+7) agar tanggal & jam di laporan akurat.
- */
+
+
 export function formatReportDateTime(
   raw: string | null | undefined,
   opts: { withSeconds?: boolean } = {},
 ): { date: string; time: string; full: string } {
   if (!raw) return { date: '-', time: '-', full: '-' }
-  // SQLite CURRENT_TIMESTAMP disimpan dalam UTC
+
   const iso = /Z|[+-]\d{2}:\d{2}$/.test(raw) ? raw : `${raw.replace(' ', 'T')}Z`
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return { date: raw, time: '', full: raw }
@@ -187,26 +194,34 @@ export function formatReportDateTime(
   }).replace(/\./g, ':')
   return { date, time, full: `${date} · ${time} WIB` }
 }
-/** Label tempat/wilayah baris laporan — dipakai ReportSheet & ReportsTab. */
+
+
+
 export function reportPlace(t: ReportTrip): string {
   return t.region_name ? `${t.region_name}${t.region_code ? ` (${t.region_code})` : ''}` : '-'
 }
 
-/** "Nama (KODE)" bila nama tersedia, hanya KODE bila tidak, "-" bila keduanya kosong. */
+
+
 function placePair(name?: string | null, code?: string | null): string {
   if (name) return code ? `${name} (${code})` : name
   return code || '-'
 }
 
+
+
 export function reportAsal(t: ReportTrip): string {
   return placePair(t.route_from_name, t.route_from)
 }
+
+
 
 export function reportTujuan(t: ReportTrip): string {
   return placePair(t.route_to_name, t.route_to)
 }
 
-/** Rentang tanggal filter untuk header ekspor ("2026-01-01 s/d 2026-01-31"). */
+
+
 export function reportRentang(f: ReportFilters): string {
   return f.startDate || f.endDate
     ? `${f.startDate || 'Awal'} s/d ${f.endDate || 'Akhir'}`

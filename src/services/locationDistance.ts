@@ -1,10 +1,7 @@
-// ─── Geolokasi laporan: jarak koordinat foto ke titik geofence terdekat ────────
-// Kolom "Lokasi" di dashboard (ReportSheet & ReportsTab) kini menampilkan
-// "<jarak>m dari <nama titik>" (contoh: "80m dari SBDZ") alih-alih pasangan
-// koordinat mentah — koordinat tetap tersedia sebagai tooltip & link Google Maps.
 import type { GeofenceRule } from './geofences'
 
-/** Jarak great-circle (haversine) dalam meter. */
+
+
 export function haversineMeters(
   lat1: number,
   lon1: number,
@@ -21,14 +18,15 @@ export function haversineMeters(
   return 2 * R * Math.asin(Math.min(1, Math.sqrt(a)))
 }
 
+
+
 export interface LocationDistance {
-  /** Jarak pembulatan ke bawah (meter) dari foto ke titik geofence terdekat. */
   meters: number
-  /** Kode/nama titik geofence — locationName ("SBDZ") atau fallback nama panjang. */
+
   label: string
-  /** Nama lengkap titik (untuk tooltip). */
+
   pointName: string
-  /** Koordinat titik geofence (tooltip & pembanding). */
+
   pointLat: number
   pointLng: number
 }
@@ -38,10 +36,8 @@ interface Coords {
   longitude?: number | null
 }
 
-/**
- * Cari titik geofence TERDEKAT dari koordinat sebuah dokumentasi foto.
- * Return null bila koordinat kosong/invalid atau daftar titik kosong.
- */
+
+
 export function nearestGeofence(
   coords: Coords,
   rules: GeofenceRule[],
@@ -58,7 +54,6 @@ export function nearestGeofence(
     const meters = haversineMeters(lat, lng, plat, plng)
     if (!best || meters < best.meters) {
       best = {
-        // Bulatkan ke bawah (conservative — jangan mengebesarkan jarak)
         meters: Math.floor(meters),
         label: r.locationName,
         pointName: r.locationName,
@@ -70,7 +65,8 @@ export function nearestGeofence(
   return best
 }
 
-/** Teks kolom Lokasi: "80m dari SBDZ" — atau null bila tak bisa dihitung. */
+
+
 export function locationDistanceText(
   coords: Coords,
   rules: GeofenceRule[],

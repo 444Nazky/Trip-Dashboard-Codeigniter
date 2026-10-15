@@ -6,6 +6,8 @@ interface CurrencyDisplayProps {
   prefix?: string
 }
 
+
+
 export function CurrencyDisplay({ amount, revealed, onToggleReveal, className = '', prefix = 'Rp ' }: CurrencyDisplayProps) {
   const formatted = `${prefix}${amount.toLocaleString('id-ID')}`
 

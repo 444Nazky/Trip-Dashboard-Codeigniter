@@ -7,15 +7,18 @@ const { randomUUID } = require('crypto');
 const { db } = require('../db');
 const { authenticate } = require('../middleware/auth');
 
+
+
 const photoExtension = (mimetype) => ({
   'image/jpeg': '.jpg',
   'image/png': '.png',
   'image/webp': '.webp',
 }[mimetype]);
 
-// Folder tujuan foto harus sama dengan yang disajikan static server
-// (satu konstanta di backend/src/uploads-dir.js)
 const { UPLOADS_DIR } = require('../uploads-dir');
+
+
+
 const uploadDocumentation = multer({
   storage: multer.diskStorage({
     destination: (_req, _file, cb) => cb(null, UPLOADS_DIR),
@@ -27,28 +30,34 @@ const uploadDocumentation = multer({
   },
 });
 
+
+
 const validPhotoIndex = (value, files) =>
   value === null || value === undefined
     ? null
     : Number.isInteger(value) && value >= 0 && value < files.length ? value : undefined;
 
+
+
 const numericCoordinate = (value) => Number.isFinite(value) ? value : null;
 
-// Generate trip number
+
+
 function generateTripNo() {
   const date = new Date();
   const dateStr = date.toISOString().slice(0, 10).replace(/-/g, '');
-  // crypto.randomBytes (4 bytes = ~4 miliar kombinasi) — tidak dapat diprediksi
+
   const random = require('crypto').randomBytes(4).toString('hex').toUpperCase();
   return `TRP${dateStr}${random}`;
 }
 
-// Create a trip with its complete photo manifest in one multipart request.
+
+
 router.post('/complete', authenticate, uploadDocumentation.array('photos', 50), (req, res) => {
   const files = req.files || [];
   const writtenFiles = files.map(file => file.path);
   const cleanupFiles = () => writtenFiles.forEach(filePath => {
-    try { fs.unlinkSync(filePath); } catch { /* already removed */ }
+    try { fs.unlinkSync(filePath); } catch {}
   });
   try {
     const payload = JSON.parse(req.body.payload || '{}');
@@ -99,8 +108,7 @@ router.post('/complete', authenticate, uploadDocumentation.array('photos', 50), 
       const masterTariff = db.prepare(`
         SELECT * FROM tariffs WHERE vehicle_type = ? AND is_active = 1 LIMIT 1
       `).get(vehicle.vehicleType);
-      // Amount yang DIBAYAR petugas = source of truth (mobile yang pegang kas).
-      // Master tariff hanya fallback kalau mobile tidak mengirim amount valid.
+
       const amount = (typeof vehicle.tariffAmount === 'number' && vehicle.tariffAmount > 0)
         ? vehicle.tariffAmount
         : (masterTariff
@@ -131,7 +139,8 @@ router.post('/complete', authenticate, uploadDocumentation.array('photos', 50), 
   }
 });
 
-// Get trips — officers see their region, admins see everything
+
+
 router.get('/', authenticate, (req, res) => {
   try {
     const { regionId, role } = req.officer;
@@ -165,5 +174,7 @@ router.get('/', authenticate, (req, res) => {
     res.status(500).json({ error: 'Failed to fetch trips' });
   }
 });
+
+
 
 module.exports = router;

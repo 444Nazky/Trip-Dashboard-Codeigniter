@@ -16,38 +16,89 @@ const appDownloadRoutes = require('./routes/appDownload');
 const { UPLOADS_DIR } = require('./uploads-dir');
 const { db } = require('./db');
 
+
+
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
 
+
+
 app.use(cors());
+
+
+
 app.use(express.json());
 
-// Serve uploaded photos publicly (folder yang sama dengan tujuan multer)
+
+
 app.use('/uploads', express.static(UPLOADS_DIR));
 
-// Attach db to all requests
+
+
 app.use((req, _res, next) => {
   req.db = db;
   next();
 });
 
+
+
 app.use('/api/auth', authRoutes);
+
+
+
 app.use('/api/trips', tripRoutes);
+
+
+
 app.use('/api/tariffs', tariffRoutes);
+
+
+
 app.use('/api/region-tariffs', regionTariffRoutes);
+
+
+
 app.use('/api/plates', plateRoutes);
+
+
+
 app.use('/api/officers', officerRoutes);
+
+
+
 app.use('/api/regions', regionRoutes);
+
+
+
 app.use('/api/dermagas', dermagaRoutes);
+
+
+
 app.use('/api/routes', routeRoutes);
+
+
+
 app.use('/api/reports', reportRoutes);
+
+
+
 app.use('/api/geofences', geofenceRoutes);
+
+
+
 app.use('/api/v1', appVersionRoutes);
+
+
+
 app.use('/api/v1', appDownloadRoutes);
+
+
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
+
+
 
 app.use((err, req, res, next) => {
   console.error(err.stack);
