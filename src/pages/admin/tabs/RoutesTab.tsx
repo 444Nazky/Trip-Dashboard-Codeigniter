@@ -102,9 +102,9 @@ export function RoutesTab({ showToast }: RoutesTabProps) {
     if (fresh) setRouteRows(fresh as RouteRow[])
   }
 
-  const loadGeofencePoints = async (routeCode: string) => {
+  const loadGeofencePoints = async (routeCode: string, dermagaId?: string) => {
     if (!routeCode) return
-    const points = await fetchGeofencePointsForRoute(routeCode)
+    const points = await fetchGeofencePointsForRoute(routeCode, dermagaId)
     const mapped: GeofencePoint[] = points.map(p => ({
       id: p.id,
       locationName: p.locationName,
@@ -122,7 +122,7 @@ export function RoutesTab({ showToast }: RoutesTabProps) {
     setMapsLink('')
     setCurrentRouteForGeofence(r)
     const routeCode = `${r.route_from}-${r.route_to}`
-    await loadGeofencePoints(routeCode)
+    await loadGeofencePoints(routeCode, r.dermaga_id)
   }
 
   const closeGeofencePanel = () => {
@@ -260,6 +260,10 @@ export function RoutesTab({ showToast }: RoutesTabProps) {
       return
     }
 
+    // ponytail: titik baru WAJIB memakai dermaga rute ini. Dulu dermagaId tidak
+    // pernah dikirim → titik tersimpan "berlaku umum" dan muncul di SEMUA dermaga
+    // petugas (radius saling menimpa → "Lokasi Tidak Sesuai Dermaga" palsu).
+    const routeDermagaId = currentRouteForGeofence?.dermaga_id ?? null
     const data = {
       locationName: locationName.trim(),
       latitude: Number(lat),
@@ -269,13 +273,18 @@ export function RoutesTab({ showToast }: RoutesTabProps) {
     }
 
     if (id) {
-      const ok = await updateGeofenceRule(id, data)
+      // Edit titik lama (mis. ubah koordinat): sekalian ikat ke dermaga rute ini
+      // supaya data lama yang NULL ikut terrapikan, tanpa pernah mengosongkannya.
+      const ok = await updateGeofenceRule(id, {
+        ...data,
+        ...(routeDermagaId ? { dermagaId: routeDermagaId } : {}),
+      })
       if (!ok) {
         showToast('Gagal update titik geofence', 'error')
         return
       }
     } else {
-      const newId = await createRouteGeofencePoint(routeCode, data)
+      const newId = await createRouteGeofencePoint(routeCode, data, { dermagaId: routeDermagaId })
       if (!newId) {
         showToast('Gagal tambah titik geofence', 'error')
         return
@@ -284,7 +293,7 @@ export function RoutesTab({ showToast }: RoutesTabProps) {
 
     showToast(id ? 'Titik geofence diperbarui' : 'Titik geofence ditambahkan')
     setActiveGeofence(null)
-    await loadGeofencePoints(routeCode)
+    await loadGeofencePoints(routeCode, currentRouteForGeofence?.dermaga_id)
   }
 
   const deleteGeofencePoint = async (point: GeofencePoint, routeCode: string) => {
@@ -299,7 +308,7 @@ export function RoutesTab({ showToast }: RoutesTabProps) {
       return
     }
     showToast('Titik geofence dihapus')
-    await loadGeofencePoints(routeCode)
+    await loadGeofencePoints(routeCode, currentRouteForGeofence?.dermaga_id)
   }
 
   const getRouteCode = () => {
