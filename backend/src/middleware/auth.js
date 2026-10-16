@@ -1,5 +1,13 @@
 const jwt = require('jsonwebtoken');
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-do-not-use-in-production';
+
+const JWT_SECRET = (() => {
+  const s = process.env.JWT_SECRET;
+  if (!s) {
+    console.error('[auth] JWT_SECRET environment variable is required — server cannot start without it');
+    process.exit(1);
+  }
+  return s;
+})();
 
 
 

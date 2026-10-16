@@ -163,9 +163,13 @@ export function OfficersTab({ officers, onSaveOfficers, showToast }: OfficersTab
 
   const handleAddOff = async () => {
     if (!offForm.name || !offForm.pin) return showToast('Lengkapi form!', 'error')
+    if (offForm.pin.length < 4) return showToast('PIN minimal 4 digit!', 'error')
     const region = regions.find(r => r.code === offForm.region)
+    // ponytail: username dikirim eksplisit — rumus SAMA dengan fallback tampilan
+    // (nama lowercase tanpa spasi) dan derivasi backend, jadi @ di tabel = login.
+    const username = offForm.name.trim().toLowerCase().replace(/\s+/g, '')
     const res = await api.post<{ id: string }>('/officers', {
-      name: offForm.name, pin: offForm.pin, regionId: region?.id,
+      name: offForm.name.trim(), username, pin: offForm.pin, regionId: region?.id,
       regionIds: region ? [region.id] : undefined,
       dermagaIds: offForm.dermagaIds.length > 0 ? offForm.dermagaIds : undefined,
     })
@@ -186,7 +190,9 @@ export function OfficersTab({ officers, onSaveOfficers, showToast }: OfficersTab
       const validDm = new Set(dermagaOptionsFor(chosen).map(d => d.id))
       const dmIds = editDermagaIds.filter(id => validDm.has(id))
       await api.put(`/officers/${be.id}/dermagas`, { dermagaIds: dmIds })
-      if (editOff.pin && editOff.pin.length === 6) await api.put(`/officers/${be.id}/pin`, { pin: editOff.pin })
+      // ponytail: ambang PIN disamakan dengan create (≥4). Dulu hanya ==6 yang
+      // dikirim sehingga PIN 4-5 digit "terupdate" di UI tapi tidak di DB.
+      if (editOff.pin && editOff.pin.length >= 4) await api.put(`/officers/${be.id}/pin`, { pin: editOff.pin })
       await reloadAndSync(await api.getOk<BackendOfficerRow[]>('/officers'))
     }
     setEditOffIdx(null)
